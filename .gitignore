@@ -1,0 +1,8 @@
+__pycache__/
+.idea
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+.coverage
+/.ssh/
