@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="GithubDefaultAccount">
+    <option name="defaultAccountId" value="3108f877-2298-4645-b31e-5f26524cc2d2" />
+  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (HDX-QA-Notifications)" project-jdk-type="Python SDK" />
+  <component name="SshConsoleOptionsProvider">
+    <option name="myEncoding" value="UTF-8" />
+    <option name="myConnectionType" value="NONE" />
+    <option name="myConnectionId" value="" />
+  </component>
+</project>

@@ -1,0 +1,39 @@
+#version: "3.5"
+
+# If you already have redis in another docker stack you can specify here that network.
+# And then also specify the network in the 'listener' service
+networks:
+  redis-network:
+    name: hdx_geo_local_default
+    external: true
+
+services:
+  hdx-notifications:
+#    image:
+    build: .
+    hostname: hdx-notifications
+    volumes:
+      - ".:/srv/listener"
+      - ".ssh/authorized_keys:/root/.ssh/authorized_keys"
+    ports:
+      - "60066:22"
+    environment:
+      # LISTENER_MODE: ${LISTENER_MODE:-true}
+      WORKER_ENABLED: ${WORKER_ENABLED:-true}
+      REDIS_STREAM_PORT: ${REDIS_STREAM_PORT:-6379}
+      REDIS_STREAM_HOST: ${REDIS_STREAM_HOST:-redis}
+      REDIS_STREAM_DB: ${REDIS_STREAM_DB:-7}
+      REDIS_STREAM_STREAM_NAME: ${REDIS_STREAM_STREAM_NAME:-hdx_event_stream}
+      REDIS_STREAM_GROUP_NAME: ${REDIS_STREAM_GROUP_NAME:-hdx_jp_sw_hdx_notification_platform_group}
+      REDIS_STREAM_CONSUMER_NAME: ${REDIS_STREAM_CONSUMER_NAME:-hdx_jp_sw_hdx_notification_platform_1}
+      NOVU_API_KEY: ${NOVU_API_KEY:-YOUR_NOVU_API_KEY}
+      HDX_URL: ${HDX_URL:-https://hdx.website.url}
+      HDX_KEY: ${HDX_KEY:-YOUR_HDX_TOKEN}
+    entrypoint: [ "tail", "-f", "/dev/null" ]
+    networks:
+      - redis-network
+
+  # redis is only needed for testing and locally playing with redis
+  # redis:
+  #   image: redis:7-alpine
+  #   hostname: redis
