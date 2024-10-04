@@ -22,6 +22,19 @@ ALLOWED_EVENT_TYPES = {
     EVENT_TYPE_SPREADSHEET_SHEET_CHANGED,
 }
 
+def get_change_summary(event):
+    if event :
+        ev_type = event.get('event_type')
+        resource_name = event.get('resource_name','A resource')
+        if ev_type == EVENT_TYPE_RESOURCE_CREATED:
+            return f'{resource_name} was created'
+        if ev_type == EVENT_TYPE_RESOURCE_DELETED:
+            return f'{resource_name} was deleted'
+        if ev_type == EVENT_TYPE_RESOURCE_DATA_CHANGED:
+            return f'{resource_name} was updated'
+        if ev_type == EVENT_TYPE_SPREADSHEET_SHEET_CHANGED or ev_type == EVENT_TYPE_SPREADSHEET_SHEET_CREATED or ev_type == EVENT_TYPE_SPREADSHEET_SHEET_DELETED:
+            return f'Resource structure was changed for {resource_name}'
+    return None
 
 def do_nothing_for_ever():
     while True:

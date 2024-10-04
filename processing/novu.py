@@ -12,7 +12,7 @@ config = get_config()
 
 def push_notification_to_novu(data_dict: Dict):
     event = data_dict.get('event')
-    dataset_id = data_dict.get('dataset_id')
+    dataset_id = event.get('dataset_id')
     url = config.NOVU_API_URL
 
     payload = json.dumps({

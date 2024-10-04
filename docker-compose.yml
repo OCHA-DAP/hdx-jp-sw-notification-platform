@@ -9,8 +9,8 @@ networks:
 
 services:
   hdx-notifications:
-#    image:
-    build: .
+    image: public.ecr.aws/unocha/hdx-jp-sw-notification-platform:dev
+#    build: .
     hostname: hdx-notifications
     volumes:
       - ".:/srv/listener"
