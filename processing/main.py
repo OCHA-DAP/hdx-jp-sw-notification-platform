@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Set
 
-from helpers import get_change_summary
+from processing.helpers import get_change_summary
 from processing.novu import push_notification_to_novu
 
 logger = logging.getLogger(__name__)
@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 def process(dataset_id_list: Set[str], event: Dict):
     if dataset_id_list:
+        # comment this line if you need to test local (without matching the dataset id to the list
         if event and 'dataset_id' in event and event.get('dataset_id') in dataset_id_list:
             change_summary = get_change_summary(event)
             data_dict = {

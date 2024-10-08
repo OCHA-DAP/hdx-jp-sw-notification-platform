@@ -14,20 +14,21 @@ def push_notification_to_novu(data_dict: Dict):
     event = data_dict.get('event')
     dataset_id = event.get('dataset_id')
     url = config.NOVU_API_URL
+    try:
+        payload = json.dumps({
+            'name': 'dataset-notification',
+            'to': {
+                'type': 'Topic',
+                'topicKey': f'dataset-{dataset_id}'
+            },
+            'payload': data_dict,
+        })
+    except Exception as ex:
+        logger.error(ex)
 
-    payload = json.dumps({
-        'name': 'dataset-notification',
-        'to': {
-            'type': 'Topic',
-            'topicKey': f'dataset-{dataset_id}'
-        },
-        'payload': {
-            data_dict
-        }
-    })
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': config.NOVU_API_KEY
+        'Authorization': f'ApiKey {config.NOVU_API_KEY}'
     }
 
     response = requests.request('POST', url, headers=headers, data=payload)
