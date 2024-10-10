@@ -12,9 +12,11 @@ def process(dataset_id_list: Set[str], event: Dict):
         # comment this line if you need to test local (without matching the dataset id to the list
         if event and 'dataset_id' in event and event.get('dataset_id') in dataset_id_list:
             change_summary = get_change_summary(event)
+            _dataset_id = event.get('dataset_id').replace('-', '_')
             data_dict = {
                 'event': event,
-                'change_summary': change_summary
+                'change_summary': change_summary,
+                'unsubscribe_token_key': f'unsubscribe_token_{_dataset_id}'
             }
             push_notification_to_novu(data_dict)
 
