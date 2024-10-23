@@ -15,7 +15,6 @@ class Config:
 
 CONFIG = None
 
-
 def get_config() -> Config:
     global CONFIG
     if not CONFIG:
