@@ -13,7 +13,7 @@ DATASET_ID_LIST = None
 
 
 def hdx_retrieve_datasets_with_notifications() -> Set[str]:
-    url = config.GOOGLE_SHEETS_DATASET_ID_LIST_URL
+    url = config.HDX_ENABLED_DATASETS_CSV
     try:
         response = requests.get(url)
         response.raise_for_status()  # Raise an exception for HTTP errors
