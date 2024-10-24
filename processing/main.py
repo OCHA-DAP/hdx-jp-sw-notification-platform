@@ -3,9 +3,11 @@ from typing import Dict, Set
 
 from processing.helpers import get_change_summary
 from processing.novu import push_notification_to_novu
+from config.config import get_config
 
 logger = logging.getLogger(__name__)
 
+config = get_config()
 
 def process(dataset_id_list: Set[str], event: Dict):
     if dataset_id_list:
@@ -16,7 +18,8 @@ def process(dataset_id_list: Set[str], event: Dict):
             data_dict = {
                 'event': event,
                 'change_summary': change_summary,
-                'unsubscribe_token_key': f'unsubscribe_token_{_dataset_id}'
+                'unsubscribe_token_key': f'unsubscribe_token_{_dataset_id}',
+                'hdx_url': config.HDX_URL
             }
             push_notification_to_novu(data_dict)
 
