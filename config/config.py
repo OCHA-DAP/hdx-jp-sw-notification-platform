@@ -11,6 +11,7 @@ class Config:
     HDX_ENABLED_DATASETS_CSV: str
     NOVU_API_KEY: str
     NOVU_API_URL: str
+    HDX_URL: str
 
 
 CONFIG = None
@@ -24,6 +25,7 @@ def get_config() -> Config:
                                                         'https://docs.google.com/spreadsheets/d/e/2PACX-1vSsBSUTM3f9olyhVFDcAh-tXV63wlOtvsXukQIHTLiLCfbGJC8osDDaEqzoUVs2B0kgYMrkyVkihvVm/pub?gid=0&single=true&output=csv'),
             NOVU_API_KEY=os.getenv('NOVU_API_KEY'),
             NOVU_API_URL=os.getenv('NOVU_API_URL', 'https://api.novu.co/v1/events/trigger'),
+            HDX_URL= os.getenv('HDX_URL', 'https://stage.data-humdata-org.ahconu.org'),
         )
 
     return CONFIG
