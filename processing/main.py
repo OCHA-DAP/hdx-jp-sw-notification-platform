@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 config = get_config()
 
 def is_cached_expired(start_time, cache_time):
-    cache_expiration_in_hours = int(config.HDX_DATASETS_CSV_EXPIRATION_PERIOD)
+    cache_expiration_in_hours = int(config.HDX_DATASETS_CSV_EXPIRATION_HOURS)
     if start_time - cache_time > datetime.timedelta(hours=cache_expiration_in_hours):
         return True
     else:

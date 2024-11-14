@@ -34,6 +34,7 @@ if __name__ == '__main__':
             start_time = datetime.datetime.now()
             if is_cached_expired(start_time, cache_time):
                 dataset_id_list = get_dataset_id_list(is_expired=True)
+                cache_time = datetime.datetime.now()
             process(dataset_id_list, event)
             end_time = datetime.datetime.now()
             elapsed_time = end_time - start_time
