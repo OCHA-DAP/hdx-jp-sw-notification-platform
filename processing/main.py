@@ -1,4 +1,5 @@
 import logging
+import datetime
 from typing import Dict, Set
 
 from processing.helpers import get_change_summary
@@ -8,6 +9,13 @@ from config.config import get_config
 logger = logging.getLogger(__name__)
 
 config = get_config()
+
+def is_cached_expired(start_time, cache_time):
+    cache_expiration_in_hours = int(config.HDX_DATASETS_CSV_EXPIRATION_PERIOD)
+    if start_time - cache_time > datetime.timedelta(hours=cache_expiration_in_hours):
+        return True
+    else:
+        return False
 
 def process(dataset_id_list: Set[str], event: Dict):
     if dataset_id_list:

@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging.config
+from linecache import cache
 
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
 
@@ -8,7 +9,7 @@ from config.config import get_config
 from processing.datasets import get_dataset_id_list
 from processing.helpers import ALLOWED_EVENT_TYPES
 from processing.helpers import do_nothing_for_ever
-from processing.main import process
+from processing.main import process, is_cached_expired
 
 logging.config.fileConfig('logging.conf')
 logger = logging.getLogger(__name__)
@@ -17,17 +18,22 @@ logger = logging.getLogger(__name__)
 config = get_config()
 
 dataset_id_list = get_dataset_id_list()
+cache_time = datetime.datetime.now()
+
 
 if __name__ == '__main__':
     if not config.WORKER_ENABLED:
         do_nothing_for_ever()
-
     else:
 
         def event_processor(event):
+            global dataset_id_list
+            global cache_time
+
             logger.info('Received event: ' + json.dumps(event, ensure_ascii=False, indent=4))
             start_time = datetime.datetime.now()
-
+            if is_cached_expired(start_time, cache_time):
+                dataset_id_list = get_dataset_id_list(is_expired=True)
             process(dataset_id_list, event)
             end_time = datetime.datetime.now()
             elapsed_time = end_time - start_time
