@@ -30,9 +30,9 @@ def hdx_retrieve_datasets_with_notifications() -> Set[str]:
     return datasets
 
 
-def get_dataset_id_list():
+def get_dataset_id_list(is_expired=False):
     global DATASET_ID_LIST
-    if not DATASET_ID_LIST:
+    if not DATASET_ID_LIST or is_expired:
         try:
             DATASET_ID_LIST = hdx_retrieve_datasets_with_notifications()
         except Exception as e:
