@@ -1,8 +1,8 @@
 import logging
-
+import mock
 from processing.helpers import get_change_summary
 from processing.datasets import get_dataset_id_list
-
+from processing.main import process as process
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +33,22 @@ def _generate_resource_created_test_event():
             },
             {
                 'field': 'name',
-                'new_value': 'ING.Account.Statement_30-09-24_999911495277_USD.pdf',
-                'new_display_value': 'ING.Account.Statement_30-09-24_999911495277_USD.pdf',
+                'new_value': 'test.csv',
+                'new_display_value': 'test.csv',
                 'old_value': None,
                 'old_display_value': None
             },
             {
                 'field': 'format',
-                'new_value': 'PDF',
-                'new_display_value': 'PDF',
+                'new_value': 'csv',
+                'new_display_value': 'csv',
                 'old_value': None,
                 'old_display_value': None
             },
             {
                 'field': 'url',
-                'new_value': 'https://data.humdata.local/dataset/f679245a-5740-4ba6-a395-ec4e1ac20325/resource/b017f603-fb5e-4169-a7c5-88dbf202d368/download/ing.account.statement_30-09-24_999911495277_usd.pdf',
-                'new_display_value': 'https://data.humdata.local/dataset/f679245a-5740-4ba6-a395-ec4e1ac20325/resource/b017f603-fb5e-4169-a7c5-88dbf202d368/download/ing.account.statement_30-09-24_999911495277_usd.pdf',
+                'new_value': 'https://data.humdata.local/dataset/f679245a-5740-4ba6-a395-ec4e1ac20325/resource/b017f603-fb5e-4169-a7c5-88dbf202d368/download/test.csv',
+                'new_display_value': 'https://data.humdata.local/dataset/f679245a-5740-4ba6-a395-ec4e1ac20325/resource/b017f603-fb5e-4169-a7c5-88dbf202d368/download/test.csv',
                 'old_value': None,
                 'old_display_value': None
             }
@@ -72,3 +72,16 @@ def test_get_change_summary():
 def test_get_dataset_id_list():
     dataset_id_list = get_dataset_id_list()
     assert len(dataset_id_list) > 0
+
+@mock.patch('processing.main.push_notification_to_novu')
+def test_skip_values_not_skipping(push_notification_mock):
+    event_dict = _generate_resource_created_test_event()
+    process({'test-dataset-id'},event_dict)
+    assert push_notification_mock.call_count == 1
+
+@mock.patch('processing.main.push_notification_to_novu')
+def test_skip_values_skipping(push_notification_mock):
+    event_dict = _generate_resource_created_test_event()
+    event_dict['resource_name'] = 'Testing QuickCharts file .csv'
+    process({'test-dataset-id'}, event_dict)
+    assert push_notification_mock.call_count == 0
