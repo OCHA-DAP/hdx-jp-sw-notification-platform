@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ ALLOWED_EVENT_TYPES = {
     EVENT_TYPE_SPREADSHEET_SHEET_CHANGED,
 }
 
-def get_change_summary(event):
+def get_change_summary(event: Dict)->str:
     if event :
         ev_type = event.get('event_type')
         resource_name = event.get('resource_name','A resource')
