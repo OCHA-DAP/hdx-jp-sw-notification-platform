@@ -18,7 +18,7 @@ def is_cached_expired(start_time: datetime, cache_time: datetime):
         return False
 
 # List of resource names to skip
-SKIP_RESOURCE_NAMES_LIST = ['QuickCharts', 'qc_data.csv']
+SKIP_RESOURCE_NAMES_LIST = ['QuickCharts', 'qc_data.csv', 'quickcharts', 'Quickcharts']
 
 def contains_any_skip_resource(input_string: str, skip_list: List[str]):
     """
