@@ -1,17 +1,17 @@
-import datetime
-import json
 import logging.config
-from linecache import cache
-
-from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars
-
-from config.config import get_config
-from processing.datasets import get_dataset_id_list
-from processing.helpers import ALLOWED_EVENT_TYPES
-from processing.helpers import do_nothing_for_ever
-from processing.main import process, is_cached_expired
-
 logging.config.fileConfig('logging.conf')
+
+import datetime  # noqa
+import json  # noqa
+
+from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars  # noqa
+
+from config.config import get_config  # noqa
+from processing.datasets import get_dataset_id_list  # noqa
+from processing.helpers import ALLOWED_EVENT_TYPES  # noqa
+from processing.helpers import do_nothing_for_ever  # noqa
+from processing.main import process, is_cached_expired  # noqa
+
 logger = logging.getLogger(__name__)
 
 
