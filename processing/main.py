@@ -2,7 +2,7 @@ import logging
 import datetime
 from typing import Dict, Set, List
 
-from processing.helpers import get_change_summary
+from processing.helpers import get_change_summary, get_email_event_type
 from processing.novu import push_notification_to_novu
 from config.config import get_config
 
@@ -40,9 +40,12 @@ def process(dataset_id_list: Set[str], event: Dict):
 
             if not contains_any_skip_resource(event.get('resource_name', ''), SKIP_RESOURCE_NAMES_LIST):
                 change_summary = get_change_summary(event)
+                email_event_type = get_email_event_type(event)
                 _dataset_id = event.get('dataset_id').replace('-', '_')
                 data_dict = {
                     'event': event,
+                    'email_event_type': email_event_type,
+                    'resource_name': event.get('resource_name', ''),
                     'change_summary': change_summary,
                     'unsubscribe_token_key': f'unsubscribe_token_{_dataset_id}',
                     'hdx_url': config.HDX_URL
