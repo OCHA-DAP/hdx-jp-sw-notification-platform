@@ -37,6 +37,12 @@ def get_change_summary(event: Dict)->str:
             return f'The resource/file structure was changed for "{resource_name}"'
     return None
 
+def get_email_event_type(event: Dict) -> str:
+    event_type = event.get('event_type')
+    if event_type in {EVENT_TYPE_SPREADSHEET_SHEET_CREATED, EVENT_TYPE_SPREADSHEET_SHEET_DELETED, EVENT_TYPE_SPREADSHEET_SHEET_CHANGED}:
+        return 'spreadsheet-sheet-updated'
+    return event_type
+
 def do_nothing_for_ever():
     while True:
         logger.info('Worker is relaxing as it is not enabled')
