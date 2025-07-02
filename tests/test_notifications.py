@@ -1,7 +1,7 @@
 import logging
 import mock
 from processing.helpers import get_change_summary
-from processing.datasets import get_dataset_id_list
+from processing.objects import get_object_id_list
 from processing.main import process as process
 
 logger = logging.getLogger(__name__)
@@ -69,9 +69,9 @@ def test_get_change_summary():
     assert 'was created' in summary
 
 
-def test_get_dataset_id_list():
-    dataset_id_list = get_dataset_id_list()
-    assert len(dataset_id_list) > 0
+def test_get_object_id_list():
+    object_id_list = get_object_id_list()
+    assert len(object_id_list) > 0
 
 @mock.patch('processing.main.push_notification_to_novu')
 def test_skip_values_not_skipping(push_notification_mock):
