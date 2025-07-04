@@ -2,8 +2,8 @@ import logging
 import datetime
 from typing import Dict, Set, List
 
-from processing.helpers import get_change_summary, get_email_event_type
-from processing.novu import push_notification_to_novu
+from listener_processing.helpers import get_change_summary, get_email_event_type
+from listener_processing.novu import push_notification_to_novu
 from config.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -55,3 +55,4 @@ def process(dataset_id_list: Set[str], event: Dict):
     else:
         pass  # dataset id list empty, pushing notification for every dataset?
     logger.info(f'Dataset name is {event.get("dataset_name")}')
+

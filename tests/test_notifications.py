@@ -1,8 +1,8 @@
 import logging
 import mock
-from processing.helpers import get_change_summary
-from processing.datasets import get_dataset_id_list
-from processing.main import process as process
+from listener_processing.helpers import get_change_summary
+from listener_processing.datasets import get_dataset_id_list
+from listener_processing.main import process as process
 
 logger = logging.getLogger(__name__)
 
