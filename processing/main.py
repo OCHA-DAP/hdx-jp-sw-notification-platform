@@ -33,11 +33,17 @@ def contains_any_skip_resource(input_string: str, skip_list: List[str]):
     """
     return any(skip_item in input_string for skip_item in skip_list)
 
-def process(object_id_list: Set[str], event: Dict):
-    if object_id_list:
+def process(objects_with_notifications: Set[str], objects_without_notifications: Set[str], event: Dict):
+    if objects_with_notifications or objects_without_notifications:
         object_identifier = f"{event.get('object_type')}_{event.get('object_id')}"
+        notifications_enabled = False
+        if config.HDX_ENABLED_OBJECTS_CSV:
+            notifications_enabled = object_identifier in objects_with_notifications
+        elif config.HDX_DISABLED_OBJECTS_CSV:
+            notifications_enabled = object_identifier not in objects_without_notifications
+
         # comment this line if you need to test local (without matching the object type+id to the list
-        if event and 'object_id' in event and object_identifier not in object_id_list:
+        if event and 'object_id' in event and notifications_enabled:
 
             if not contains_any_skip_resource(event.get('resource_name', ''), SKIP_RESOURCE_NAMES_LIST):
                 change_summary = get_change_summary(event)
