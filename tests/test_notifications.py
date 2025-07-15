@@ -77,12 +77,12 @@ def test_get_objects_with_or_without_notifications():
 @mock.patch('processing.main.push_notification_to_novu')
 def test_skip_values_not_skipping(push_notification_mock):
     event_dict = _generate_resource_created_test_event()
-    process({'test-dataset-id'},event_dict)
+    process({'test-org-id'}, {'test-dataset-id'}, event_dict)
     assert push_notification_mock.call_count == 1
 
 @mock.patch('processing.main.push_notification_to_novu')
 def test_skip_values_skipping(push_notification_mock):
     event_dict = _generate_resource_created_test_event()
     event_dict['resource_name'] = 'Testing QuickCharts file .csv'
-    process({'test-dataset-id'}, event_dict)
+    process({'test-org-id'}, {'test-dataset-id'}, event_dict)
     assert push_notification_mock.call_count == 0
