@@ -1,56 +1,68 @@
+import datetime
+
 from common.model import DatasetToUser
-from sync_processing.get import hdx_notifications_subscription_list, hdx_get_datasets_ids_by_object
+from sync_processing.get import hdx_notifications_grouped_subscription_list, hdx_notifications_subscription_list, hdx_get_datasets_ids_by_object
 from common.utils import generate_object_hash_id, compute_tid_hash_diff
 from common.db_utils import db_session
 
 
-CKAN_DUMMY_DATA = [
-        {
-            'object': 'wfp',
-            'object_type': 'organization',
-            'query_params': '',
-            'user_list': [
-                {
-                    'user_id':'user1',
-                    'subscription_id':'sub1',
-                    'event_type':'dataset-updated',
-                }
-            ],
-            'dataset_list': ['ds3','ds4','ds5','ds6']
-        },
-
-    ]
-
-
 def process_dataset_to_user():
+    session = db_session()
 
+    # Define the time frame for the last 3 days
+    three_days_ago = datetime.datetime.now() - datetime.timedelta(days=3)
+    # Fetch subscriptions that are marked as not 'active' and modified in the last 3 days
+    data_dict_deletion = {
+        'active': False,
+        'updated': three_days_ago
+    }
+    # Fetch the list of subscriptions for deletion
+    subscriptions_for_deletion = hdx_notifications_subscription_list(data_dict_deletion)
+    # Extract subscription IDs from the fetched subscriptions
+    subscription_ids_to_delete = [sub['id'] for sub in subscriptions_for_deletion]
+    DatasetToUser.delete_by_subscription_ids(session, subscription_ids_to_delete)
 
-    # TODO select * subscriptions where state = 'deleted' and modified in last 3 days=> delete from dataset to user where sub_id=sub_id
-    # subscription_list = ['sub1', 'sub2']
-    # session = db_session()
-    # DatasetToUser.delete_by_subscription_ids(session, subscription_list)
+    ckan_subscriptions = hdx_notifications_grouped_subscription_list()
+    for ckan_subscription in ckan_subscriptions:
+        data_dict = {'object_type': ckan_subscription.get('object_type'), 'object_id': ckan_subscription.get('object')}
+        object_datasets = hdx_get_datasets_ids_by_object(data_dict)
+        ckan_subscription['dataset_list'] = object_datasets
 
-    # read all notif data from ckan db
-    hdx_notif_sub_list = hdx_notifications_subscription_list({})
-    print('hdx_notif_sub_list: done')
+        user_list = ckan_subscription.get('user_list', [])
+        if user_list:
+            notify_subscription = DatasetToUser.get_by_subscription_id(session, subscription_id=user_list[0].get('subscription_id'))
+        else:
+            notify_subscription = None
 
-    #TODO run query on ckan to get list of datasets_ids - do it in ckan - wrap over package_search - don't include private, archived, fl param
-    # for each notif in hdx_notif_sub_list
-        # dataset_id_list = hdx_get_datasets_ids_by_object({'object_type':'organization', 'object_id':'acaps'})
-        # add list to notif item -> e.g. CKAN_DUMMY_DATA
+        sets = compute_tid_hash_diff(ckan_subscription, notify_subscription)
+        to_be_deleted = sets[1]
+        to_be_inserted = sets[0]
+        DatasetToUser.delete_by_tid_hash_list(session, tid_hash_list=to_be_deleted)
 
-    compute_tid_hash_diff(CKAN_DUMMY_DATA, hdx_notif_sub_list)
+        for user in ckan_subscription.get('user_list'):
+            objects_to_be_inserted = []
 
-    #DatasetToUser.delete_by_tid_hash_list(session, tid_hash_list=tid_hash_list)
+            for dataset in ckan_subscription.get('dataset_list', []):
+                if dataset['tid_hash'] in to_be_inserted:
+                    object_type = ckan_subscription.get('object_type', '')
+                    object_id = ckan_subscription.get('object', '')
+                    dataset_id = dataset['id']
+                    subscription_id = user['subscription_id']
+                    entry = {
+                        'id': generate_object_hash_id(object_type, object_id, dataset_id, subscription_id),
+                        'dataset_id': dataset_id,
+                        'object_id': object_id,
+                        'object_type': object_type,
+                        'user_id': user['user_id'],
+                        'subscription_id': subscription_id,
+                        'event_type': user.get('event_type', ''),
+                        'tid_hash': dataset['tid_hash'],
+                    }
+                    objects_to_be_inserted.append(entry)
 
-    # records = DatasetToUser.get_by_tid_hash(session, tid_hash)
+            if objects_to_be_inserted:
+                DatasetToUser.bulk_insert_from_dicts(session, objects_to_be_inserted)
 
+        session.commit()
 
-
-    # get set1 - from notify db
-    # set2 - ckan db
-    # set3 = set1 - set2 data to be deleted from notify db
-    # set4 = set2 - set1 data to be inserted in notify db
-    # delete from notify db set3
-    # insert into notify db set4
     pass

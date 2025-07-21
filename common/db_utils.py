@@ -1,9 +1,11 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from config.config import get_config
 
-# Define connection URL - en0:
-DATABASE_URL = 'postgresql://user:password@db:5432/mydatabase'
+config = get_config()
+
+DATABASE_URL = f'postgresql://{config.DB_USER}:{config.DB_PASS}@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}'
 Base = declarative_base()
 
 SESSION = None
