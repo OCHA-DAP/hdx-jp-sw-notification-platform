@@ -13,11 +13,12 @@ class Config:
     DB_HOST: str
     DB_PORT: str
     DB_NAME: str
-    HDX_ENABLED_DATASETS_CSV: str
+    HDX_ENABLED_OBJECTS_CSV: str
+    HDX_DISABLED_OBJECTS_CSV: str
     NOVU_API_KEY: str
     NOVU_API_URL: str
     HDX_URL: str
-    HDX_DATASETS_CSV_EXPIRATION_HOURS: str
+    HDX_OBJECTS_CSV_EXPIRATION_HOURS: str
     HDX_PKG_SEARCH_URL: str
     HDX_API_KEY: str
     HDX_NOTIFICATIONS_SUBCRIPTION_LIST_URL: str
@@ -37,11 +38,11 @@ def get_config() -> Config:
             DB_HOST=os.getenv('DB_HOST', 'db'),
             DB_PORT=os.getenv('DB_PORT', '5432'),
             DB_NAME=os.getenv('DB_NAME', 'notify'),
-            HDX_ENABLED_DATASETS_CSV=os.getenv(
-                'HDX_ENABLED_DATASETS_CSV',
-                'https://docs.google.com/spreadsheets/d/e/2PACX-1vSsBSUTM3f9olyhVFDcAh-tXV63wlOtvsXukQIHTLiLCfbGJC8osDDaEqzoUVs2B0kgYMrkyVkihvVm/pub?gid=0&single=true&output=csv',
-            ),
-            HDX_DATASETS_CSV_EXPIRATION_HOURS=os.getenv('HDX_DATASETS_CSV_EXPIRATION_HOURS', '1'),
+            HDX_ENABLED_OBJECTS_CSV=os.getenv('HDX_ENABLED_OBJECTS_CSV',
+                                                        'https://docs.google.com/spreadsheets/d/e/2PACX-1vSsBSUTM3f9olyhVFDcAh-tXV63wlOtvsXukQIHTLiLCfbGJC8osDDaEqzoUVs2B0kgYMrkyVkihvVm/pub?gid=1577519693&single=true&output=csv'),
+            HDX_DISABLED_OBJECTS_CSV=os.getenv('HDX_DISABLED_OBJECTS_CSV',
+                                                        'https://docs.google.com/spreadsheets/d/e/2PACX-1vSsBSUTM3f9olyhVFDcAh-tXV63wlOtvsXukQIHTLiLCfbGJC8osDDaEqzoUVs2B0kgYMrkyVkihvVm/pub?gid=558881647&single=true&output=csv'),
+            HDX_OBJECTS_CSV_EXPIRATION_HOURS=os.getenv('HDX_OBJECTS_CSV_EXPIRATION_HOURS', '1'),
             NOVU_API_KEY=os.getenv('NOVU_API_KEY'),
             NOVU_API_URL=os.getenv('NOVU_API_URL', 'https://api.novu.co/v1/events/trigger'),
             #TODO

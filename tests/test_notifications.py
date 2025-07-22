@@ -1,7 +1,7 @@
 import logging
 import mock
 from listener_processing.helpers import get_change_summary
-from listener_processing.datasets import get_dataset_id_list
+from listener_processing.objects import get_objects_with_notifications, get_objects_without_notifications
 from listener_processing.main import process as process
 
 logger = logging.getLogger(__name__)
@@ -69,19 +69,20 @@ def test_get_change_summary():
     assert 'was created' in summary
 
 
-def test_get_dataset_id_list():
-    dataset_id_list = get_dataset_id_list()
-    assert len(dataset_id_list) > 0
+def test_get_objects_with_or_without_notifications():
+    objects_with_notifications = get_objects_with_notifications()
+    objects_without_notifications = get_objects_without_notifications()
+    assert len(objects_with_notifications) > 0 or len(objects_without_notifications) > 0
 
 @mock.patch('processing.main.push_notification_to_novu')
 def test_skip_values_not_skipping(push_notification_mock):
     event_dict = _generate_resource_created_test_event()
-    process({'test-dataset-id'},event_dict)
+    process({'test-org-id'}, {'test-dataset-id'}, event_dict)
     assert push_notification_mock.call_count == 1
 
 @mock.patch('processing.main.push_notification_to_novu')
 def test_skip_values_skipping(push_notification_mock):
     event_dict = _generate_resource_created_test_event()
     event_dict['resource_name'] = 'Testing QuickCharts file .csv'
-    process({'test-dataset-id'}, event_dict)
+    process({'test-org-id'}, {'test-dataset-id'}, event_dict)
     assert push_notification_mock.call_count == 0
