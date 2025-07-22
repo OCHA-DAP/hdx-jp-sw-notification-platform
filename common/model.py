@@ -34,7 +34,7 @@ class DatasetToUser(Base):
         self.subscription_id = subscription_id
         self.event_type = event_type
         self.tid_hash = generate_object_hash_id(object_type, object_id, dataset_id)
-        self.id = generate_object_hash_id(object_type, object_id, dataset_id, user_id, subscription_id)
+        self.id = generate_object_hash_id(object_type, object_id, dataset_id, subscription_id)
 
     # def insert(self, session):
     #     session.add(self)
@@ -74,7 +74,7 @@ class DatasetToUser(Base):
         if not tid_hash_list:
             return 0
         result = session.query(cls).filter(cls.tid_hash.in_(tid_hash_list)).delete(synchronize_session=False)
-        session.commit()
+        # session.commit()
         return result  # no deleted rows
 
     # Insert from dicts (if using plain data, not ORM objects)
@@ -85,7 +85,7 @@ class DatasetToUser(Base):
                 cls.__table__.insert(),
                 data_dicts
             )
-            session.commit()
+            # session.commit()
         except IntegrityError as e:
             session.rollback()
             raise e
@@ -112,6 +112,10 @@ class DatasetToUser(Base):
     @classmethod
     def get_by_user_id(cls, session, user_id):
         return session.query(cls).filter_by(user_id=user_id).all()
+
+    @classmethod
+    def get_by_subscription_id(cls, session, subscription_id):
+        return session.query(cls).filter_by(subscription_id=subscription_id).all()
 
     @classmethod
     def get_by_tid_hash(cls, session, tid_hash):
