@@ -39,26 +39,29 @@ def process_dataset_to_user():
         to_be_inserted = sets[0]
         DatasetToUser.delete_by_tid_hash_list(session, tid_hash_list=to_be_deleted)
 
+        datasets_to_be_inserted = [
+           d for d in ckan_subscription.get('dataset_list', []) if d['tid_hash'] in to_be_inserted
+        ]
+
         for user in ckan_subscription.get('user_list'):
             objects_to_be_inserted = []
 
-            for dataset in ckan_subscription.get('dataset_list', []):
-                if dataset['tid_hash'] in to_be_inserted:
-                    object_type = ckan_subscription.get('object_type', '')
-                    object_id = ckan_subscription.get('object', '')
-                    dataset_id = dataset['id']
-                    subscription_id = user['subscription_id']
-                    entry = {
-                        'id': generate_object_hash_id(object_type, object_id, dataset_id, subscription_id),
-                        'dataset_id': dataset_id,
-                        'object_id': object_id,
-                        'object_type': object_type,
-                        'user_id': user['user_id'],
-                        'subscription_id': subscription_id,
-                        'event_type': user.get('event_type', ''),
-                        'tid_hash': dataset['tid_hash'],
-                    }
-                    objects_to_be_inserted.append(entry)
+            for dataset in datasets_to_be_inserted:
+                object_type = ckan_subscription.get('object_type', '')
+                object_id = ckan_subscription.get('object', '')
+                dataset_id = dataset['id']
+                subscription_id = user['subscription_id']
+                entry = {
+                    'id': generate_object_hash_id(object_type, object_id, dataset_id, subscription_id),
+                    'dataset_id': dataset_id,
+                    'object_id': object_id,
+                    'object_type': object_type,
+                    'user_id': user['user_id'],
+                    'subscription_id': subscription_id,
+                    'event_type': user.get('event_type', ''),
+                    'tid_hash': dataset['tid_hash'],
+                }
+                objects_to_be_inserted.append(entry)
 
             if objects_to_be_inserted:
                 DatasetToUser.bulk_insert_from_dicts(session, objects_to_be_inserted)
