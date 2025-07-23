@@ -5,7 +5,7 @@ from config.config import get_config
 
 config = get_config()
 
-DATABASE_URL = f'postgresql://{config.DB_USER}:{config.DB_PASS}@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}'
+DATABASE_URL = f'postgresql://{config.HDX_NOTIFICATIONSDB_USER}:{config.HDX_NOTIFICATIONSDB_PASS}@{config.HDX_NOTIFICATIONSDB_ADDR}:{config.HDX_NOTIFICATIONSDB_PORT}/{config.HDX_NOTIFICATIONSDB_DB}'
 Base = declarative_base()
 
 SESSION = None

@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Config:
     WORKER_ENABLED: bool
-    DB_USER: str
-    DB_PASS: str
-    DB_HOST: str
-    DB_PORT: str
-    DB_NAME: str
+    HDX_NOTIFICATIONSDB_USER: str
+    HDX_NOTIFICATIONSDB_PASS: str
+    HDX_NOTIFICATIONSDB_ADDR: str
+    HDX_NOTIFICATIONSDB_PORT: str
+    HDX_NOTIFICATIONSDB_DB: str
     HDX_ENABLED_OBJECTS_CSV: str
     HDX_DISABLED_OBJECTS_CSV: str
     NOVU_API_KEY: str
@@ -33,11 +33,11 @@ def get_config() -> Config:
     if not CONFIG:
         CONFIG = Config(
             WORKER_ENABLED=os.getenv('WORKER_ENABLED') == 'true',
-            DB_USER=os.getenv('DB_USER', 'notify'),
-            DB_PASS=os.getenv('DB_PASS', 'notify'),
-            DB_HOST=os.getenv('DB_HOST', 'db'),
-            DB_PORT=os.getenv('DB_PORT', '5432'),
-            DB_NAME=os.getenv('DB_NAME', 'notify'),
+            HDX_NOTIFICATIONSDB_USER=os.getenv('HDX_NOTIFICATIONSDB_USER', 'notify'),
+            HDX_NOTIFICATIONSDB_PASS=os.getenv('HDX_NOTIFICATIONSDB_PASS', 'notify'),
+            HDX_NOTIFICATIONSDB_ADDR=os.getenv('HDX_NOTIFICATIONSDB_ADDR', 'db'),
+            HDX_NOTIFICATIONSDB_PORT=os.getenv('HDX_NOTIFICATIONSDB_PORT', '5432'),
+            HDX_NOTIFICATIONSDB_DB=os.getenv('HDX_NOTIFICATIONSDB_DB', 'notify'),
             HDX_ENABLED_OBJECTS_CSV=os.getenv('HDX_ENABLED_OBJECTS_CSV',
                                                         'https://docs.google.com/spreadsheets/d/e/2PACX-1vSsBSUTM3f9olyhVFDcAh-tXV63wlOtvsXukQIHTLiLCfbGJC8osDDaEqzoUVs2B0kgYMrkyVkihvVm/pub?gid=1577519693&single=true&output=csv'),
             HDX_DISABLED_OBJECTS_CSV=os.getenv('HDX_DISABLED_OBJECTS_CSV',
