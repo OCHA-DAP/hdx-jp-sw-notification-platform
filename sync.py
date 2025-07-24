@@ -87,6 +87,6 @@ if __name__ == '__main__':
     test_db()
     init_db()
     # add_test_data()
-    process_dataset_to_user()
+    # process_dataset_to_user()
 
     print('done')
