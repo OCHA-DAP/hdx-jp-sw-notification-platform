@@ -45,7 +45,6 @@ def get_config() -> Config:
             HDX_OBJECTS_CSV_EXPIRATION_HOURS=os.getenv('HDX_OBJECTS_CSV_EXPIRATION_HOURS', '1'),
             NOVU_API_KEY=os.getenv('NOVU_API_KEY'),
             NOVU_API_URL=os.getenv('NOVU_API_URL', 'https://api.novu.co/v1/events/trigger'),
-            #TODO
             HDX_URL= os.getenv('HDX_URL', 'https://data.humdata.local'),
             HDX_PKG_SEARCH_URL=os.getenv('HDX_PKG_SEARCH_URL', '/api/3/action/package_search'),
             HDX_NOTIFICATIONS_SUBCRIPTION_LIST_URL=os.getenv(
