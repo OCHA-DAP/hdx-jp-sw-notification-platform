@@ -61,20 +61,6 @@ def process_dataset_to_user():
            d for d in ckan_subscription.get('dataset_list', []) if d['tid_hash'] in to_be_inserted
         ]
 
-        # Add the event to the Redis stream
-        event_type = f'{object_type}-dataset-added'
-        event = {
-            'event_type': event_type,
-            'event_time': datetime.now().isoformat(),
-            'event_source': 'ckan',
-            'object_type': object_type,
-            'object_id': object_id,
-            'dataset_list': to_be_inserted,
-        }
-        logger.info('Processing event type {}'.format(event['event_type']))
-        event_bus.push_hdx_event(event)
-        logger.info('Finished processing event type {}'.format(event['event_type']))
-
         for user in ckan_subscription.get('user_list'):
             user_id = user.get('user_id', '')
             subscription_id = user.get('subscription_id', '')
@@ -99,6 +85,24 @@ def process_dataset_to_user():
             if objects_to_be_inserted:
                 DatasetToUser.bulk_insert_from_dicts(session, objects_to_be_inserted)
 
+        # Add the event to the Redis stream
+        _push_to_event_bus(object_id, object_type, datasets_to_be_inserted)
+
         session.commit()
 
+
     pass
+
+def _push_to_event_bus(object_id, object_type, datasets_to_be_inserted):
+    event_type = f'{object_type}-dataset-added'
+    event = {
+            'event_type': event_type,
+            'event_time': datetime.datetime.now().isoformat(),
+            'event_source': 'ckan',
+            'object_type': object_type,
+            'object_id': object_id,
+            'dataset_list': datasets_to_be_inserted,
+        }
+    logger.info('Processing event type {}'.format(event['event_type']))
+    event_bus.push_hdx_event(event)
+    logger.info('Finished processing event type {}'.format(event['event_type']))
