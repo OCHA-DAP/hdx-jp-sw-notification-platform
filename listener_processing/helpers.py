@@ -31,6 +31,12 @@ ALLOWED_EVENT_TYPES = {
     EVENT_TYPE_GROUP_DATASET_ADDED,
 }
 
+COLLECTION_EVENT_TYPES = {
+    EVENT_TYPE_ORG_DATASET_ADDED,
+    EVENT_TYPE_CRISIS_DATASET_ADDED,
+    EVENT_TYPE_GROUP_DATASET_ADDED,
+}
+
 def get_change_summary(event: Dict)->str:
     if event :
         ev_type = event.get('event_type')

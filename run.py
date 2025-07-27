@@ -10,10 +10,7 @@ from listener_processing.objects import get_objects_with_notifications, get_obje
 from listener_processing.helpers import ALLOWED_EVENT_TYPES  # noqa
 from listener_processing.helpers import do_nothing_for_ever  # noqa
 from listener_processing.main import process, is_cached_expired  # noqa
-from common.db_utils import test_db, init_db  # noqa
-from common.model import DatasetToUser  # noqa
-from common.db_utils import db_session  # noqa
-from common.model import generate_object_hash_id  # noqa
+
 
 
 logger = logging.getLogger(__name__)

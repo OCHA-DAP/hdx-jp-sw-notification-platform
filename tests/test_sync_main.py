@@ -1,65 +1,12 @@
 import pytest
 import uuid
 from unittest.mock import patch
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-from common.model import NotifyObject, Dataset, Subscription, Base
+from common.model import NotifyObject, Dataset, Subscription
 from common.utils import generate_object_hash_id
 from sync_processing.main import process_dataset_to_user
 from config.config import get_config
 
-
-@pytest.fixture(scope='function')
-def db_session_for_testing():
-    """Create a test database session for each test"""
-    import os
-    from sqlalchemy import text
-
-    # Set test environment variables to use the test database
-    test_env = {
-        'HDX_NOTIFICATIONSDB_USER': 'notify',
-        'HDX_NOTIFICATIONSDB_PASS': 'notify',
-        'HDX_NOTIFICATIONSDB_ADDR': 'dbckan',
-        'HDX_NOTIFICATIONSDB_PORT': '5432',
-        'HDX_NOTIFICATIONSDB_DB': 'notify_test'  # Use the test database you created
-    }
-
-    for key, value in test_env.items():
-        os.environ[key] = value  # Force override to use test values
-
-    # Reset the global config to pick up new environment variables
-    import config.config
-    config.config.CONFIG = None
-
-    config = get_config()
-
-    # Connect to the test database
-    test_database_url = f'postgresql://{config.HDX_NOTIFICATIONSDB_USER}:{config.HDX_NOTIFICATIONSDB_PASS}@{config.HDX_NOTIFICATIONSDB_ADDR}:{config.HDX_NOTIFICATIONSDB_PORT}/{config.HDX_NOTIFICATIONSDB_DB}'
-    test_engine = create_engine(test_database_url)
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-
-    # Create all tables
-    Base.metadata.create_all(bind=test_engine)
-
-    # Create session
-    session = TestSessionLocal()
-
-    try:
-        # Patch the global session and engine
-        with patch('common.db_utils.SESSION', session), \
-             patch('common.db_utils._engine', test_engine), \
-             patch('sync_processing.main.db_session', return_value=session):
-
-            yield session
-    finally:
-        # Cleanup - truncate all tables for clean state between tests
-        session.rollback()
-        for table in reversed(Base.metadata.sorted_tables):
-            session.execute(text(f'TRUNCATE TABLE {table.name} RESTART IDENTITY CASCADE'))
-        session.commit()
-        session.close()
-        test_engine.dispose()
 
 
 @pytest.fixture
