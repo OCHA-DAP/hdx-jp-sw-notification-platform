@@ -13,6 +13,12 @@ from common.utils import compute_tid_hash_diff
 from common.db_utils import db_session
 from hdx_redis_lib import connect_to_hdx_write_only_event_bus, RedisConfig  # noqa
 
+DATASET_COLLECTION_TYPES = {
+    'organization',
+    'group',
+    'crisis',
+}
+
 logger = logging.getLogger(__name__)
 
 redis_stream_host = os.getenv('REDIS_STREAM_HOST', 'redis')
@@ -137,7 +143,7 @@ def process_dataset_to_user():
                     logger.info(f'Inserted {len(subscription_entries)} new subscriptions for object {object_id}')
 
             # Step 7: Push event to Redis if there were dataset changes
-            if False:
+            if object_type in DATASET_COLLECTION_TYPES and datasets_to_be_inserted:
                 _push_to_event_bus(object_id, object_type, datasets_to_be_inserted)
 
         # Commit all changes
