@@ -9,7 +9,7 @@ from sync_processing.get import (
     hdx_notifications_subscription_list,
     hdx_get_datasets_ids_by_object
 )
-from common.utils import compute_tid_hash_diff
+from common.utils import compute_dataset_diff
 from common.db_utils import db_session
 from hdx_redis_lib import connect_to_hdx_write_only_event_bus, RedisConfig  # noqa
 
@@ -87,7 +87,7 @@ def process_dataset_to_user():
 
             # Step 5: Compare datasets and sync them
             existing_datasets = Dataset.get_by_notify_object_id(session, notify_object.id)
-            to_be_inserted, to_be_deleted = compute_tid_hash_diff(ckan_subscription, existing_datasets)
+            to_be_inserted, to_be_deleted = compute_dataset_diff(ckan_subscription, existing_datasets)
 
             # Delete outdated datasets
             if to_be_deleted:

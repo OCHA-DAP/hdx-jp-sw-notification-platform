@@ -14,22 +14,28 @@ def generate_object_hash_id(
     return generate_hash(object_type,object_id, dataset_id, subscription_id)
 
 
-def compute_tid_hash_diff(subscription_from_ckan, subscription_from_notify):
-    # 1. Extract tid_hashes from CKAN subscription
-    ckan_tid_hashes = set()
+def compute_dataset_diff(subscription_from_ckan, datasets_from_notify):
+    """
+    Compare datasets between CKAN subscription and existing notify datasets.
+    Returns datasets to insert and dataset IDs to delete.
+    Note that Dataset.id is the tid_hash.
+    """
+    # 1. Extract dataset IDs from CKAN subscription
+    ckan_dataset_ids = set()
     object_id = subscription_from_ckan['object']
     object_type = subscription_from_ckan['object_type']
+
     for dataset in subscription_from_ckan['dataset_list']:
         dataset_id = dataset.get('id')
-        tid = generate_object_hash_id(object_type, object_id, dataset_id)
-        dataset['tid_hash'] = tid
-        ckan_tid_hashes.add(tid)
+        tid_hash = generate_object_hash_id(object_type, object_id, dataset_id)
+        dataset['tid_hash'] = tid_hash
+        ckan_dataset_ids.add(tid_hash)
 
-    # 2. Extract tid_hashes from Notify subscription
-    notify_tid_hashes = {row.tid_hash for row in subscription_from_notify}
+    # 2. Extract dataset IDs from existing notify datasets (using the id field which is the tid_hash)
+    notify_dataset_ids = {dataset.id for dataset in datasets_from_notify}
 
     # 3. Set operations
-    a_minus_b = ckan_tid_hashes - notify_tid_hashes
-    b_minus_a = notify_tid_hashes - ckan_tid_hashes
+    to_be_inserted = ckan_dataset_ids - notify_dataset_ids
+    to_be_deleted = notify_dataset_ids - ckan_dataset_ids
 
-    return a_minus_b, b_minus_a
+    return to_be_inserted, to_be_deleted
