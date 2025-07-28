@@ -1,10 +1,11 @@
 import datetime
-import os
+import logging
 import requests
 from typing import Dict, Any, List, Optional
 from config.config import get_config
 
 config = get_config()
+logger = logging.getLogger(__name__)
 
 def hdx_action(url: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
@@ -32,14 +33,19 @@ def hdx_package_search(params: Dict[str, Any]) -> List[Dict[str, Any]]:
     return hdx_action(url, params)
 
 
-def get_all_subscriptions(updated: Optional[datetime.datetime] = None, active: Optional[bool] = True, page_size: int = 100) -> List[Dict[str, Any]]:
+def get_all_subscriptions(
+    updated: Optional[datetime.datetime] = None,
+    active: Optional[bool] = True,
+    page_size: int = 100
+) -> List[Dict[str, Any]]:
     """
     Fetch all notification subscriptions from HDX.
     Requires API key with sysadmin privileges.
 
     Args:
         updated (Optional[datetime.datetime]): Filter subscriptions modified on or after this datetime.
-        active (Optional[bool]): Fetch 'active' subscriptions if True; fetch non-active ones if False. Defaults to True.
+        active (Optional[bool]): Fetch 'active' subscriptions if True;
+            fetch non-active ones if False. Defaults to True.
         page_size (int): The number of subscriptions per page. Defaults to 100.
 
     Returns:
@@ -94,7 +100,7 @@ def get_grouped_subscriptions() -> List[Dict[str, Any]]:
     data = response.json()
 
     if not data.get('success'):
-        raise RuntimeError(f'API call failed on page {page}: {data}')
+        raise RuntimeError(f'API call failed: {data}')
 
     page_result = data.get('result', [])
 
@@ -109,8 +115,10 @@ def hdx_notifications_subscription_list(params: Dict[str, Any]) -> List[Dict[str
 
     Args:
         params (Dict[str, Any]): A dictionary containing parameters for fetching subscriptions.
-            - updated (Optional[datetime.datetime]): Filter subscriptions modified on or after this datetime.
-            - active (Optional[bool]): Fetch 'active' subscriptions if True; fetch non-active ones if False. Defaults to True.
+            - updated (Optional[datetime.datetime]): Filter subscriptions modified
+              on or after this datetime.
+            - active (Optional[bool]): Fetch 'active' subscriptions if True;
+              fetch non-active ones if False. Defaults to True.
 
     Returns:
         List[Dict[str, Any]]: A list of subscription dictionaries.
@@ -137,3 +145,72 @@ def hdx_get_datasets_ids_by_object(params: Dict[str, Any]) -> List[Dict[str, Any
     else:
         url = config.HDX_URL + config.HDX_DATASETS_IDS_BY_OBJECT_URL
         return hdx_action(url, params)
+
+
+def hdx_get_datasets_metadata(dataset_ids: List[str]) -> List[Dict[str, Any]]:
+    """
+    Get dataset metadata (title, name) for multiple datasets using package_search.
+
+    Args:
+        dataset_ids: List of dataset IDs to fetch metadata for
+
+    Returns:
+        List of dataset dictionaries with metadata
+    """
+    if not dataset_ids:
+        return []
+
+    # Create a query to search for multiple datasets by ID
+    id_query = ' OR '.join([f'id:{dataset_id}' for dataset_id in dataset_ids])
+    params = {
+        'q': id_query,
+        'rows': len(dataset_ids),
+        'fl': 'id,name,title'  # Only fetch the fields we need
+    }
+
+    url = config.HDX_URL + config.HDX_PKG_SEARCH_URL
+    logger.info(f'Calling package_search API: {url} with query: {id_query}')
+
+    try:
+        response = hdx_action(url, params)
+        datasets = response.get('results', [])
+        logger.info(f'Retrieved metadata for {len(datasets)} datasets')
+        return datasets
+    except Exception as e:
+        logger.error(f'Failed to fetch dataset metadata: {e}')
+        raise
+
+
+def hdx_get_object_metadata(object_id: str, object_type: str) -> Dict[str, Any]:
+    """
+    Get object metadata (title, name) for organization, group, or crisis.
+
+    Args:
+        object_id: The object ID
+        object_type: The object type (organization, group, crisis)
+
+    Returns:
+        Dictionary with object metadata
+    """
+    endpoint_map = {
+        'organization': '/api/3/action/organization_show',
+        'group': '/api/3/action/group_show',
+        'crisis': '/api/3/action/page_show'
+    }
+
+    if object_type not in endpoint_map:
+        raise ValueError(f'Unsupported object type: {object_type}')
+
+    endpoint = endpoint_map[object_type]
+    url = config.HDX_URL + endpoint
+    params = {'id': object_id}
+
+    logger.info(f'Calling {object_type} API: {url} with id: {object_id}')
+
+    try:
+        response = hdx_action(url, params)
+        logger.info(f'Retrieved metadata for {object_type}: {object_id}')
+        return response
+    except Exception as e:
+        logger.error(f'Failed to fetch {object_type} metadata for {object_id}: {e}')
+        raise

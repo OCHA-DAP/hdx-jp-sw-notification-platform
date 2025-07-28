@@ -57,11 +57,11 @@ def _handle_collection_event(session, event: Dict):
         'event': event,
         'email_event_type': email_event_type,
         # number of datasets that were added to the collection
-        'change_summary': f'{len(event.get("dataset_list", []))} datasets added',
+        'change_summary': f'{len(event.get("added_datasets", []))} datasets added',
         'hdx_url': config.HDX_URL,
         'object_type': object_type,
         'object_id': object_id,
-        'dataset_list': event.get('dataset_list', [])
+        'added_datasets': event.get('added_datasets', [])
     }
 
     # Send notifications to all subscribed users
@@ -164,7 +164,7 @@ def _are_notifications_enabled(
     objects_with_notifications: Set[str],
     objects_without_notifications: Set[str],
 ) -> bool:
-    
+
     if not is_collection_event:
         object_identifier = f"dataset_{event.get('dataset_id')}"
     elif event.get('object_id'):
