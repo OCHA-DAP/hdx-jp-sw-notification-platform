@@ -132,5 +132,8 @@ def hdx_notifications_grouped_subscription_list():
 
 
 def hdx_get_datasets_ids_by_object(params: Dict[str, Any]) -> List[Dict[str, Any]]:
-    url = config.HDX_URL + config.HDX_DATASETS_IDS_BY_OBJECT_URL
-    return hdx_action(url, params)
+    if params.get('object_type') == 'dataset':
+        return [{'id': params.get('object_id')}]
+    else:
+        url = config.HDX_URL + config.HDX_DATASETS_IDS_BY_OBJECT_URL
+        return hdx_action(url, params)
