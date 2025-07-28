@@ -46,7 +46,7 @@ def sample_collection_event():
         'event_source': 'ckan',
         'object_id': 'test-org-789',
         'object_type': 'organization',
-        'dataset_list': ['dataset-1', 'dataset-2', 'dataset-3'],
+        'added_datasets': ['dataset-1', 'dataset-2', 'dataset-3'],
         'object_name': 'Test Organization'
     }
 
@@ -240,7 +240,7 @@ class TestListenerProcessing:
         assert payload_dict['name'] == 'dataset-collection-notification'
         assert payload_dict['to']['subscriberId'] == 'user-org-456'
         assert payload_dict['payload']['object_type'] == 'organization'
-        assert payload_dict['payload']['dataset_list'] == ['dataset-1', 'dataset-2', 'dataset-3']
+        assert payload_dict['payload']['added_datasets'] == ['dataset-1', 'dataset-2', 'dataset-3']
 
     @patch('requests.request')
     def test_handle_dataset_event_missing_dataset_id(
@@ -272,7 +272,7 @@ class TestListenerProcessing:
         # Setup - event without object_id or object_type
         event = {
             'event_type': EVENT_TYPE_ORG_DATASET_ADDED,
-            'dataset_list': ['dataset-1', 'dataset-2']
+            'added_datasets': ['dataset-1', 'dataset-2']
             # Missing object_id and object_type
         }
 

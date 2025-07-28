@@ -41,7 +41,7 @@ def get_change_summary(event: Dict)->str:
     if event :
         ev_type = event.get('event_type')
         resource_name = event.get('resource_name', 'A resource')
-        dataset_list = event.get('dataset_list', [])
+        # dataset_list = event.get('dataset_list', [])
         if ev_type == EVENT_TYPE_RESOURCE_CREATED:
             return f'The resource/file "{resource_name}" was created'
         if ev_type == EVENT_TYPE_RESOURCE_DELETED:
@@ -54,12 +54,12 @@ def get_change_summary(event: Dict)->str:
             EVENT_TYPE_SPREADSHEET_SHEET_DELETED,
         }:
             return f'The resource/file structure was changed for "{resource_name}"'
-        if ev_type in {
-            EVENT_TYPE_ORG_DATASET_ADDED,
-            EVENT_TYPE_CRISIS_DATASET_ADDED,
-            EVENT_TYPE_GROUP_DATASET_ADDED,
-        }:
-            return f'The following datasets were added: {", ".join(dataset_list)}'
+        # if ev_type in {
+        #     EVENT_TYPE_ORG_DATASET_ADDED,
+        #     EVENT_TYPE_CRISIS_DATASET_ADDED,
+        #     EVENT_TYPE_GROUP_DATASET_ADDED,
+        # }:
+        #     return f'The following datasets were added: {", ".join(dataset_list)}'
     return None
 
 def get_email_event_type(event: Dict) -> str:

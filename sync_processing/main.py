@@ -7,7 +7,9 @@ from common.model import NotifyObject, Dataset, Subscription
 from sync_processing.get import (
     hdx_notifications_grouped_subscription_list,
     hdx_notifications_subscription_list,
-    hdx_get_datasets_ids_by_object
+    hdx_get_datasets_ids_by_object,
+    hdx_get_datasets_metadata,
+    hdx_get_object_metadata
 )
 from common.utils import compute_dataset_diff
 from common.db_utils import db_session
@@ -52,8 +54,8 @@ def process_dataset_to_user():
         subscription_ids_to_delete = [uuid.UUID(sub['id']) for sub in subscriptions_for_deletion]
 
         if subscription_ids_to_delete:
-            Subscription.delete_by_ids(session, subscription_ids_to_delete)
-            logger.info(f'Deleted {len(subscription_ids_to_delete)} inactive subscriptions')
+            subscription_delete_result = Subscription.delete_by_ids(session, subscription_ids_to_delete)
+            logger.info(f'Deleted {subscription_delete_result} inactive subscriptions')
 
 
        # Clean up objects with no subscriptions
@@ -110,7 +112,7 @@ def process_dataset_to_user():
                         'notify_object_id': notify_object.id,
                     })
                 Dataset.bulk_insert_from_dicts(session, dataset_entries)
-                logger.info(f'Inserted {len(dataset_entries)} new datasets for object {object_id}')
+                logger.info(f'Inserted {len(dataset_entries)} new datasets for {object_type} {object_id}')
 
             # Step 6: Sync subscriptions
             existing_subscriptions = Subscription.get_by_notify_object_id(session, notify_object.id)
@@ -122,7 +124,9 @@ def process_dataset_to_user():
             if subscriptions_to_delete:
                 subscription_uuids = [uuid.UUID(sub_id) for sub_id in subscriptions_to_delete]
                 Subscription.delete_by_ids(session, subscription_uuids)
-                logger.info(f'Deleted {len(subscriptions_to_delete)} obsolete subscriptions for object {object_id}')
+                logger.info(
+                    f'Deleted {len(subscriptions_to_delete)} obsolete subscriptions for {object_type} {object_id}'
+                )
 
             # Insert new subscriptions
             subscriptions_to_insert = ckan_subscription_ids - existing_subscription_ids
@@ -140,7 +144,7 @@ def process_dataset_to_user():
 
                 if subscription_entries:
                     Subscription.bulk_insert_from_dicts(session, subscription_entries)
-                    logger.info(f'Inserted {len(subscription_entries)} new subscriptions for object {object_id}')
+                    logger.info(f'Inserted {len(subscription_entries)} new subscriptions for {object_type} {object_id}')
 
             # Step 7: Push event to Redis if there were dataset changes AND the object already existed
             # Don't send events for newly created objects
@@ -163,15 +167,56 @@ def process_dataset_to_user():
 
 def _push_to_event_bus(object_id, object_type, datasets_to_be_inserted):
     """Push event to Redis event bus when datasets are added"""
-    event_type = f'{object_type}-dataset-added'
-    event = {
-        'event_type': event_type,
-        'event_time': datetime.datetime.now().isoformat(),
-        'event_source': 'ckan',
-        'object_type': object_type,
-        'object_id': object_id,
-        'dataset_list': datasets_to_be_inserted,
-    }
-    logger.info('Processing event type {}'.format(event['event_type']))
-    event_bus.push_hdx_event(event)
-    logger.info('Finished processing event type {}'.format(event['event_type']))
+    try:
+        # Step 1: Get object metadata
+        object_metadata = hdx_get_object_metadata(object_id, object_type)
+
+        # Step 2: Get dataset metadata for all datasets
+        dataset_ids = [dataset['id'] for dataset in datasets_to_be_inserted]
+        datasets_metadata = hdx_get_datasets_metadata(dataset_ids)
+
+        # Create a mapping of dataset ID to metadata for easy lookup
+        dataset_metadata_map = {dataset['id']: dataset for dataset in datasets_metadata}
+
+        # Step 3: Enrich the dataset list with metadata
+        enriched_datasets = []
+        for dataset in datasets_to_be_inserted:
+            dataset_id = dataset['id']
+            enriched_dataset = dataset.copy()  # Start with original dataset data
+
+            # Add metadata if available
+            if dataset_id in dataset_metadata_map:
+                metadata = dataset_metadata_map[dataset_id]
+                enriched_dataset.update({
+                    'name': metadata.get('name', ''),
+                    'title': metadata.get('title', '')
+                })
+            else:
+                logger.warning(f'No metadata found for dataset {dataset_id}')
+                enriched_dataset.update({
+                    'name': '',
+                    'title': ''
+                })
+
+            enriched_datasets.append(enriched_dataset)
+
+        # Step 4: Create enriched event
+        event_type = f'{object_type}-dataset-added'
+        event = {
+            'event_type': event_type,
+            'event_time': datetime.datetime.now().isoformat(),
+            'event_source': 'ckan',
+            'object_type': object_type,
+            'object_id': object_id,
+            'object_name': object_metadata.get('name', ''),
+            'object_title': object_metadata.get('title', ''),
+            'added_datasets': enriched_datasets,
+        }
+
+        logger.info('Processing event type {}'.format(event['event_type']))
+        event_bus.push_hdx_event(event)
+        logger.info('Finished processing event type {}'.format(event['event_type']))
+
+    except Exception as e:
+        logger.error(f'Failed to enrich and push event for {object_type} {object_id}: {e}')
+        raise
