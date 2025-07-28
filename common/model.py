@@ -32,13 +32,15 @@ class NotifyObject(Base):
 
     @classmethod
     def get_or_create(cls, session, object_type, hdx_id):
-        """Get existing object or create new one"""
+        """Get existing object or create new one. Returns (obj, created) tuple."""
         obj = session.query(cls).filter_by(type=object_type, hdx_id=hdx_id).first()
+        created = False
         if not obj:
             obj = cls(type=object_type, hdx_id=hdx_id)
             session.add(obj)
             session.flush()  # To get the ID
-        return obj
+            created = True
+        return obj, created
 
     @classmethod
     def delete_objects_with_no_subscriptions(cls, session):
@@ -161,7 +163,7 @@ class Subscription(Base):
     @classmethod
     def get_users_subscribed_to_object(cls, session, object_type, object_id):
         """Get all user IDs subscribed to a specific object (dataset, organization, group, crisis)"""
-        
+
         user_ids = session.query(cls.user_id).join(NotifyObject).filter(
             NotifyObject.type == object_type,
             NotifyObject.hdx_id == object_id

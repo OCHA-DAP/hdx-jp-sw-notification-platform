@@ -76,7 +76,7 @@ def process_dataset_to_user():
                 continue
 
             # Step 3: Get or create the NotifyObject
-            notify_object = NotifyObject.get_or_create(session, object_type, object_id)
+            notify_object, object_was_created = NotifyObject.get_or_create(session, object_type, object_id)
 
             # Step 4: Get datasets for this object from CKAN
             object_datasets = hdx_get_datasets_ids_by_object({
@@ -142,8 +142,11 @@ def process_dataset_to_user():
                     Subscription.bulk_insert_from_dicts(session, subscription_entries)
                     logger.info(f'Inserted {len(subscription_entries)} new subscriptions for object {object_id}')
 
-            # Step 7: Push event to Redis if there were dataset changes
-            if object_type in DATASET_COLLECTION_TYPES and datasets_to_be_inserted:
+            # Step 7: Push event to Redis if there were dataset changes AND the object already existed
+            # Don't send events for newly created objects
+            if (object_type in DATASET_COLLECTION_TYPES and
+                datasets_to_be_inserted and
+                not object_was_created):
                 _push_to_event_bus(object_id, object_type, datasets_to_be_inserted)
 
         # Commit all changes

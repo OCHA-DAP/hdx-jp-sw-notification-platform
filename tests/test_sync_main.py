@@ -5,7 +5,6 @@ from unittest.mock import patch
 from common.model import NotifyObject, Dataset, Subscription
 from common.utils import generate_object_hash_id
 from sync_processing.main import process_dataset_to_user
-from config.config import get_config
 
 
 
@@ -110,8 +109,8 @@ class TestSyncLogic:
         subscriptions = db_session_for_testing.query(Subscription).all()
         assert len(subscriptions) == 3  # 2 for org + 1 for group
 
-        # Verify event bus was called for dataset collection types
-        assert mock_event_bus.call_count == 2  # Both org and group are in DATASET_COLLECTION_TYPES
+        # Verify event bus was NOT called for newly created objects
+        assert mock_event_bus.call_count == 0  # No events for newly created objects
 
     @patch('sync_processing.main._push_to_event_bus')
     @patch('sync_processing.main.hdx_get_datasets_ids_by_object')
@@ -284,14 +283,8 @@ class TestSyncLogic:
         subscriptions = db_session_for_testing.query(Subscription).all()
         assert len(subscriptions) == 3
 
-        # Verify event bus was called only for organization and crisis (not dataset)
-        assert mock_event_bus.call_count == 2
-
-        # Check the event bus calls
-        event_calls = mock_event_bus.call_args_list
-        called_object_types = [call[0][1] for call in event_calls]  # Second argument is object_type
-        assert 'organization' in called_object_types
-        assert 'crisis' in called_object_types
+        # Verify event bus was NOT called for newly created objects
+        assert mock_event_bus.call_count == 0
 
     def test_error_handling_and_rollback(self, db_session_for_testing):
         # Create some initial data with a subscription so it doesn't get deleted as orphaned
@@ -330,3 +323,69 @@ class TestSyncLogic:
 
         assert final_object_count == initial_object_count
         assert final_subscription_count == initial_subscription_count
+
+    @patch('sync_processing.main._push_to_event_bus')
+    @patch('sync_processing.main.hdx_get_datasets_ids_by_object')
+    @patch('sync_processing.main.hdx_notifications_grouped_subscription_list')
+    @patch('sync_processing.main.hdx_notifications_subscription_list')
+    def test_events_sent_for_existing_objects_only(self, mock_subscription_list, mock_grouped_list,
+                                                  mock_datasets, mock_event_bus, db_session_for_testing,
+                                                  sample_ckan_data):
+        """Test that events are only sent for existing objects, not newly created ones"""
+
+        # Create an existing object that matches one from the fixture (test-org-1)
+        existing_object = NotifyObject(type='organization', hdx_id='test-org-1')
+        db_session_for_testing.add(existing_object)
+        db_session_for_testing.flush()
+
+        # Get the first subscription from the fixture for test-org-1
+        existing_subscription_data = sample_ckan_data['grouped_subscriptions'][0]['user_list'][0]
+        existing_subscription = Subscription(
+            subscription_id=existing_subscription_data['subscription_id'],
+            user_id=existing_subscription_data['user_id'],
+            event_type=existing_subscription_data['event_type'],
+            notify_object_id=existing_object.id
+        )
+        db_session_for_testing.add(existing_subscription)
+        db_session_for_testing.commit()
+
+        # Setup mocks using fixture data
+        # test-org-1 already exists, test-group-1 will be newly created
+        mock_subscription_list.return_value = []
+        mock_grouped_list.return_value = sample_ckan_data['grouped_subscriptions']
+
+        # Mock datasets using fixture data
+        def mock_get_datasets(params):
+            object_id = params['object_id']
+            return sample_ckan_data['datasets'].get(object_id, [])
+
+        mock_datasets.side_effect = mock_get_datasets
+
+        # Run sync process
+        process_dataset_to_user()
+
+        # Verify both objects exist (test-org-1 existing, test-group-1 newly created)
+        objects = db_session_for_testing.query(NotifyObject).all()
+        assert len(objects) == 2
+
+        existing_obj = db_session_for_testing.query(NotifyObject).filter_by(hdx_id='test-org-1').first()
+        new_obj = db_session_for_testing.query(NotifyObject).filter_by(hdx_id='test-group-1').first()
+        assert existing_obj is not None
+        assert new_obj is not None
+
+        # Verify datasets were created for both objects
+        existing_datasets = db_session_for_testing.query(Dataset).filter_by(notify_object_id=existing_obj.id).all()
+        new_datasets = db_session_for_testing.query(Dataset).filter_by(notify_object_id=new_obj.id).all()
+        assert len(existing_datasets) == 3  # test-org-1 has 3 datasets in fixture
+        assert len(new_datasets) == 2  # test-group-1 has 2 datasets in fixture
+
+        # Critical test: Event bus should be called only ONCE (for the existing object, not the new one)
+        assert mock_event_bus.call_count == 1
+
+        # Verify the event was called for the existing object (test-org-1)
+        event_call = mock_event_bus.call_args_list[0]
+        called_object_id = event_call[0][0]  # First argument is object_id
+        called_object_type = event_call[0][1]  # Second argument is object_type
+
+        assert called_object_id == 'test-org-1'
+        assert called_object_type == 'organization'
