@@ -161,20 +161,13 @@ class Subscription(Base):
     @classmethod
     def get_users_subscribed_to_object(cls, session, object_type, object_id):
         """Get all user IDs subscribed to a specific object (dataset, organization, group, crisis)"""
-        # Find the NotifyObject
-        notify_object = session.query(NotifyObject).filter_by(
-            type=object_type, hdx_id=object_id
-        ).first()
-
-        if not notify_object:
-            return []
-
-        # Get all subscriptions for this object
-        subscriptions = session.query(cls).filter_by(
-            notify_object_id=notify_object.id
+        
+        user_ids = session.query(cls.user_id).join(NotifyObject).filter(
+            NotifyObject.type == object_type,
+            NotifyObject.hdx_id == object_id
         ).all()
 
-        return [sub.user_id for sub in subscriptions]
+        return [user_id[0] for user_id in user_ids]
 
 
 # Keep DatasetToUser for backward compatibility during transition
