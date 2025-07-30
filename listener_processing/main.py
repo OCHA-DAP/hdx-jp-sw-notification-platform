@@ -61,7 +61,8 @@ def _handle_collection_event(session, event: Dict):
         'hdx_url': config.HDX_URL,
         'object_type': object_type,
         'object_id': object_id,
-        'added_datasets': event.get('added_datasets', [])
+        'added_datasets': event.get('added_datasets', []),
+        'unsubscribe_token_key': f'unsubscribe_token_{object_type}_{object_id.replace("-", "_")}',
     }
 
     # Send notifications to all subscribed users
