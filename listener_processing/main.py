@@ -133,7 +133,8 @@ def process(objects_with_notifications: Set[str], objects_without_notifications:
     )
 
     if not notifications_enabled:
-        logger.info(f'Notifications not enabled for object in event: {event.get("event_type")}')
+        logger.info(f'Notifications not enabled for {event.get('object_type', 'dataset')} '
+                    f'{event.get('object_id')} in event: {event.get("event_type")}')
         return
 
     if not event:
@@ -171,10 +172,14 @@ def _are_notifications_enabled(
     elif event.get('object_id'):
         object_identifier = f"{event.get('object_type')}_{event.get('object_id')}"
 
+    inclusion_exclusion_decision = None
     if object_identifier:
         if config.HDX_ENABLED_OBJECTS_CSV:
+            inclusion_exclusion_decision = 'include'
             return object_identifier in objects_with_notifications
         elif config.HDX_DISABLED_OBJECTS_CSV:
+            inclusion_exclusion_decision = 'exclude'
             return object_identifier not in objects_without_notifications
 
+    logger.warning(f'Object {object_identifier} not found in {inclusion_exclusion_decision} list')
     return False
