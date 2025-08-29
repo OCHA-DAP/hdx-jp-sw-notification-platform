@@ -150,6 +150,7 @@ def hdx_get_datasets_ids_by_object(params: Dict[str, Any]) -> List[Dict[str, Any
 def hdx_get_datasets_metadata(dataset_ids: List[str]) -> List[Dict[str, Any]]:
     """
     Get dataset metadata (title, name) for multiple datasets using package_search.
+    Handles large lists by chunking into groups of 50 to avoid query length limits.
 
     Args:
         dataset_ids: List of dataset IDs to fetch metadata for
@@ -160,25 +161,38 @@ def hdx_get_datasets_metadata(dataset_ids: List[str]) -> List[Dict[str, Any]]:
     if not dataset_ids:
         return []
 
-    # Create a query to search for multiple datasets by ID
-    id_query = ' OR '.join([f'id:{dataset_id}' for dataset_id in dataset_ids])
-    params = {
-        'q': id_query,
-        'rows': len(dataset_ids),
-        'fl': 'id,name,title'  # Only fetch the fields we need
-    }
+    logger.info(f'Need to retrieve metadata for {len(dataset_ids)} datasets')
+    all_datasets = []
+    chunk_size = 50
 
-    url = config.HDX_URL + config.HDX_PKG_SEARCH_URL
-    logger.info(f'Calling package_search API: {url} with query: {id_query}')
+    # Process dataset IDs in chunks of 50
+    for i in range(0, len(dataset_ids), chunk_size):
+        chunk = dataset_ids[i:i + chunk_size]
 
-    try:
-        response = hdx_action(url, params)
-        datasets = response.get('results', [])
-        logger.info(f'Retrieved metadata for {len(datasets)} datasets')
-        return datasets
-    except Exception as e:
-        logger.error(f'Failed to fetch dataset metadata: {e}')
-        raise
+        # Create a query to search for multiple datasets by ID
+        id_query = ' OR '.join([f'id:{dataset_id}' for dataset_id in chunk])
+        params = {
+            'q': id_query,
+            'rows': len(chunk),
+            'fl': 'id,name,title'  # Only fetch the fields we need
+        }
+
+        url = config.HDX_URL + config.HDX_PKG_SEARCH_URL
+        chunk_num = i//chunk_size + 1
+        logger.info(f'Calling package_search API: {url} with query for {len(chunk)} datasets (chunk {chunk_num})')
+
+        try:
+            response = hdx_action(url, params)
+            datasets = response.get('results', [])
+            all_datasets.extend(datasets)
+            logger.info(f'Retrieved metadata for {len(datasets)} datasets in chunk {chunk_num}')
+        except Exception as e:
+            logger.error(f'Failed to fetch dataset metadata for chunk {chunk_num}: {e}')
+            raise
+
+    total_chunks = (len(dataset_ids) + chunk_size - 1) // chunk_size
+    logger.info(f'Retrieved metadata for {len(all_datasets)} total datasets across {total_chunks} chunks')
+    return all_datasets
 
 
 def hdx_get_object_metadata(object_id: str, object_type: str) -> Dict[str, Any]:
