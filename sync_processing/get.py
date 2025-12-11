@@ -174,7 +174,7 @@ def hdx_get_datasets_metadata(dataset_ids: List[str]) -> List[Dict[str, Any]]:
         params = {
             'q': id_query,
             'rows': len(chunk),
-            'fl': 'id,name,title'  # Only fetch the fields we need
+            # 'fl': 'id,name,title' # No longer fetching specific fields; need org title from the dict
         }
 
         url = config.HDX_URL + config.HDX_PKG_SEARCH_URL
