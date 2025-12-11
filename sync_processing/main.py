@@ -189,13 +189,15 @@ def _push_to_event_bus(object_id, object_type, datasets_to_be_inserted):
                 metadata = dataset_metadata_map[dataset_id]
                 enriched_dataset.update({
                     'name': metadata.get('name', ''),
-                    'title': metadata.get('title', '')
+                    'title': metadata.get('title', ''),
+                    'organization_title': metadata.get('organization', {}).get('title', ''),
                 })
             else:
                 logger.warning(f'No metadata found for dataset {dataset_id}')
                 enriched_dataset.update({
                     'name': '',
-                    'title': ''
+                    'title': '',
+                    'organization_title': '',
                 })
 
             enriched_datasets.append(enriched_dataset)

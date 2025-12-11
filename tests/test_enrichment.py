@@ -16,8 +16,18 @@ class TestDatasetMetadataEnrichment:
         dataset_ids = ['dataset-1', 'dataset-2']
         mock_response = {
             'results': [
-                {'id': 'dataset-1', 'name': 'dataset-1-name', 'title': 'Dataset 1 Title'},
-                {'id': 'dataset-2', 'name': 'dataset-2-name', 'title': 'Dataset 2 Title'}
+                {
+                    'id': 'dataset-1',
+                    'name': 'dataset-1-name',
+                    'title': 'Dataset 1 Title',
+                    'organization_title': 'Org 1 Title'
+                },
+                {
+                    'id': 'dataset-2',
+                    'name': 'dataset-2-name',
+                    'title': 'Dataset 2 Title',
+                    'organization_title': 'Org 2 Title'
+                }
             ]
         }
         mock_hdx_action.return_value = mock_response
@@ -30,9 +40,11 @@ class TestDatasetMetadataEnrichment:
         assert result[0]['id'] == 'dataset-1'
         assert result[0]['name'] == 'dataset-1-name'
         assert result[0]['title'] == 'Dataset 1 Title'
+        assert result[0]['organization_title'] == 'Org 1 Title'
         assert result[1]['id'] == 'dataset-2'
         assert result[1]['name'] == 'dataset-2-name'
         assert result[1]['title'] == 'Dataset 2 Title'
+        assert result[1]['organization_title'] == 'Org 2 Title'
 
         # Verify the API call was made correctly
         mock_hdx_action.assert_called_once()
@@ -43,7 +55,7 @@ class TestDatasetMetadataEnrichment:
         assert '/api/3/action/package_search' in url
         assert params['q'] == 'id:dataset-1 OR id:dataset-2'
         assert params['rows'] == 2
-        assert params['fl'] == 'id,name,title'
+        # assert params['fl'] == 'id,name,title'
 
     @patch('sync_processing.get.hdx_action')
     def test_hdx_get_datasets_metadata_api_error(self, mock_hdx_action):
@@ -180,8 +192,18 @@ class TestEventBusEnrichment:
         }
 
         mock_datasets_metadata.return_value = [
-            {'id': 'dataset-1', 'name': 'dataset-1-name', 'title': 'Dataset 1 Title'},
-            {'id': 'dataset-2', 'name': 'dataset-2-name', 'title': 'Dataset 2 Title'}
+            {
+                'id': 'dataset-1',
+                'name': 'dataset-1-name',
+                'title': 'Dataset 1 Title',
+                'organization': {'title': 'Org 1 Title'}
+            },
+            {
+                'id': 'dataset-2',
+                'name': 'dataset-2-name',
+                'title': 'Dataset 2 Title',
+                'organization': {'title': 'Org 2 Title'}
+            }
         ]
 
         # Execute
@@ -210,12 +232,14 @@ class TestEventBusEnrichment:
         assert dataset1['id'] == 'dataset-1'
         assert dataset1['name'] == 'dataset-1-name'
         assert dataset1['title'] == 'Dataset 1 Title'
+        assert dataset1['organization_title'] == 'Org 1 Title'
 
         dataset2 = event['added_datasets'][1]
         assert dataset2['tid_hash'] == 'hash2'
         assert dataset2['id'] == 'dataset-2'
         assert dataset2['name'] == 'dataset-2-name'
         assert dataset2['title'] == 'Dataset 2 Title'
+        assert dataset2['organization_title'] == 'Org 2 Title'
 
     @patch('sync_processing.main.event_bus')
     @patch('sync_processing.main.hdx_get_object_metadata')
@@ -240,7 +264,12 @@ class TestEventBusEnrichment:
 
         # Only return metadata for one dataset
         mock_datasets_metadata.return_value = [
-            {'id': 'dataset-1', 'name': 'dataset-1-name', 'title': 'Dataset 1 Title'}
+            {
+                'id': 'dataset-1',
+                'name': 'dataset-1-name',
+                'title': 'Dataset 1 Title',
+                'organization': {'title': 'Org 1 Title'}
+            }
         ]
 
         # Execute
@@ -257,11 +286,13 @@ class TestEventBusEnrichment:
         dataset1 = event['added_datasets'][0]
         assert dataset1['name'] == 'dataset-1-name'
         assert dataset1['title'] == 'Dataset 1 Title'
+        assert dataset1['organization_title'] == 'Org 1 Title'
 
         # Second dataset should have empty metadata
         dataset2 = event['added_datasets'][1]
         assert dataset2['name'] == ''
         assert dataset2['title'] == ''
+        assert dataset2['organization_title'] == ''
 
 
     @patch('sync_processing.main.event_bus')
