@@ -113,7 +113,7 @@ class TestListenerProcessing:
         call_args = mock_requests.call_args
         payload_data = call_args[1]['data']  # keyword argument 'data'
         payload_dict = json.loads(payload_data)
-        assert payload_dict['name'] == 'dataset-notification'
+        assert payload_dict['name'] == 'dataset-notification-v2'
         assert payload_dict['to']['type'] == 'Subscriber'
         assert payload_dict['to']['subscriberId'] == 'user-dataset-123'
 
@@ -213,7 +213,7 @@ class TestListenerProcessing:
         call_args = mock_requests.call_args
         payload_data = call_args[1]['data']
         payload_dict = json.loads(payload_data)
-        assert payload_dict['name'] == 'dataset-notification'
+        assert payload_dict['name'] == 'dataset-notification-v2'
         assert payload_dict['to']['subscriberId'] == 'user-dataset-123'
         assert payload_dict['payload']['dataset_id'] == 'test-dataset-123'
 

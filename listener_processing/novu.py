@@ -17,7 +17,7 @@ def push_notification_to_novu(data_dict: Dict):
     url = config.NOVU_API_URL
     try:
         payload = json.dumps({
-            'name': 'dataset-notification',
+            'name': 'dataset-notification-v2',
             'to': {
                 'type': 'Topic',
                 'topicKey': f'dataset-{dataset_id}'
@@ -43,7 +43,7 @@ def push_dataset_notification_to_user(user_id: str, data_dict: Dict):
     url = config.NOVU_API_URL
     try:
         payload = json.dumps({
-            'name': 'dataset-notification',
+            'name': 'dataset-notification-v2',
             'to': {
                 'type': 'Subscriber',
                 'subscriberId': user_id
