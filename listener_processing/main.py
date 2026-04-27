@@ -114,7 +114,7 @@ def process(objects_with_notifications: Set[str], objects_without_notifications:
 
     For dataset events (resource-created, resource-deleted, etc.):
     - Find users subscribed to the specific dataset
-    - Send individual notifications using 'dataset-notification' workflow
+    - Send individual notifications using 'dataset-notification-v2' workflow
 
     For collection events (organization-dataset-added, etc.):
     - Find users subscribed to the object (org/group/crisis)
