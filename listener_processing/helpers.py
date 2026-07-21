@@ -37,6 +37,32 @@ COLLECTION_EVENT_TYPES = {
     EVENT_TYPE_GROUP_DATASET_ADDED,
 }
 
+# Fields that, on their own, don't warrant a notification email for a
+# spreadsheet-sheet-changed event. A pure row-count change from a routine data append
+# (e.g. a daily cumulative-append dataset) is real, accurate information about the sheet -
+# other listeners on this event stream may care about it - it's just not something
+# subscribers need to be emailed about every single day (see HDX-11617).
+NON_NOTIFYING_SPREADSHEET_FIELDS = {'nrows'}
+
+
+def is_notification_worthy(event: Dict) -> bool:
+    """
+    Decide whether an event should result in a notification being sent.
+
+    Every event type is notification-worthy except spreadsheet-sheet-changed events
+    where *every* changed field is in NON_NOTIFYING_SPREADSHEET_FIELDS - e.g. a resource
+    that only had rows appended, with its header/columns/hashtags unchanged. If at least
+    one other field also changed (a genuine structural change), the event is still
+    notification-worthy.
+    """
+    if event.get('event_type') != EVENT_TYPE_SPREADSHEET_SHEET_CHANGED:
+        return True
+    changed_field_names = {field.get('field') for field in (event.get('changed_fields') or [])}
+    if not changed_field_names:
+        # no changed_fields info to go on - don't suppress on unknown data
+        return True
+    return not changed_field_names.issubset(NON_NOTIFYING_SPREADSHEET_FIELDS)
+
 def get_change_summary(event: Dict)->str:
     if event :
         ev_type = event.get('event_type')

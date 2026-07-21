@@ -5,7 +5,8 @@ from mock import patch
 
 from common.model import NotifyObject, Subscription
 from listener_processing.main import process, _handle_collection_event, _handle_dataset_event
-from listener_processing.helpers import EVENT_TYPE_ORG_DATASET_ADDED, EVENT_TYPE_RESOURCE_CREATED
+from listener_processing.helpers import EVENT_TYPE_ORG_DATASET_ADDED, EVENT_TYPE_RESOURCE_CREATED, \
+    EVENT_TYPE_SPREADSHEET_SHEET_CHANGED
 
 
 @pytest.fixture
@@ -281,3 +282,59 @@ class TestListenerProcessing:
 
         # Verify - no HTTP requests should be made
         mock_requests.assert_not_called()
+
+    @patch('common.model.Subscription.get_users_subscribed_to_object')
+    def test_handle_dataset_event_skips_row_count_only_spreadsheet_change(
+        self,
+        mock_get_subscribed_users,
+    ):
+        """Regression test for HDX-11617: a spreadsheet-sheet-changed event whose only
+        changed field is 'nrows' (e.g. a routine daily row-append) must be skipped before
+        any subscriber lookup happens - no notification should be sent for it."""
+        event = {
+            'event_type': EVENT_TYPE_SPREADSHEET_SHEET_CHANGED,
+            'event_time': '2026-06-23T10:21:49.761847',
+            'event_source': 'ckan',
+            'dataset_id': 'test-dataset-123',
+            'resource_name': 'drc_ebola_cases_consolidated.csv',
+            'resource_id': 'resource-456',
+            'changed_fields': [
+                {'field': 'nrows', 'old_value': 1828, 'new_value': 1898,
+                 'old_display_value': 1828, 'new_display_value': 1898},
+            ],
+        }
+
+        # session is deliberately not a real DB session - the function must return
+        # before ever touching it
+        _handle_dataset_event(session=None, event=event)
+
+        mock_get_subscribed_users.assert_not_called()
+
+    @patch('common.model.Subscription.get_users_subscribed_to_object')
+    def test_handle_dataset_event_notifies_on_real_structural_change(
+        self,
+        mock_get_subscribed_users,
+    ):
+        """A genuine structural change (e.g. columns added) occurring alongside a
+        row-count change must still be treated as notification-worthy."""
+        mock_get_subscribed_users.return_value = set()
+        event = {
+            'event_type': EVENT_TYPE_SPREADSHEET_SHEET_CHANGED,
+            'event_time': '2026-06-23T10:21:49.761847',
+            'event_source': 'ckan',
+            'dataset_id': 'test-dataset-123',
+            'resource_name': 'drc_ebola_cases_consolidated.csv',
+            'resource_id': 'resource-456',
+            'changed_fields': [
+                {'field': 'nrows', 'old_value': 1828, 'new_value': 1898,
+                 'old_display_value': 1828, 'new_display_value': 1898},
+                {'field': 'ncols', 'old_value': 21, 'new_value': 22,
+                 'old_display_value': 21, 'new_display_value': 22},
+            ],
+        }
+
+        _handle_dataset_event(session=None, event=event)
+
+        # we should have proceeded past the notification-worthiness check and attempted
+        # to look up subscribers
+        mock_get_subscribed_users.assert_called_once()

@@ -2,7 +2,8 @@ import logging
 import datetime
 from typing import Dict, Set, List
 
-from listener_processing.helpers import COLLECTION_EVENT_TYPES, get_change_summary, get_email_event_type
+from listener_processing.helpers import COLLECTION_EVENT_TYPES, get_change_summary, get_email_event_type, \
+    is_notification_worthy
 from listener_processing.novu import send_notifications_to_users
 from common.model import Subscription
 from common.db_utils import db_session
@@ -81,6 +82,11 @@ def _handle_dataset_event(session, event: Dict):
     resource_name = event.get('resource_name', '')
     if resource_name and contains_any_skip_resource(resource_name, SKIP_RESOURCE_NAMES_LIST):
         logger.info(f'Skipping notification for resource: {resource_name}')
+        return
+
+    if not is_notification_worthy(event):
+        logger.info(f'Skipping notification for dataset {dataset_id}: event type '
+                    f'"{event.get("event_type")}" only changed non-notifying fields')
         return
 
     # Get users subscribed to this dataset
