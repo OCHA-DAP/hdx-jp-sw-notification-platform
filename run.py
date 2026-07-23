@@ -50,6 +50,9 @@ if __name__ == '__main__':
 
         # Connect to Redis
         event_bus = connect_to_hdx_event_bus_with_env_vars()
+        # redis-py 8.0 introduced a default socket_timeout of 5s which causes xreadgroup(block=120_000ms ~= 120s)
+        # to timeout prematurely. Set it above the block duration so only genuine hangs trigger it.
+        event_bus.redis_conn.connection_pool.connection_kwargs['socket_timeout'] = 3 * 60
         logger.info('Connected to Redis')
 
         event_bus.hdx_listen(event_processor, allowed_event_types=ALLOWED_EVENT_TYPES, max_iterations=10_000)
