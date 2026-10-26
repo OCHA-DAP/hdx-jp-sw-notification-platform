@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,500&display=swap" rel="stylesheet" type="text/css">
+    <style>
+      body {
+        background-color: #fafbfb;
+      }
+      .hdx-email {
+        background-color: #fafbfb;
+        margin: 0;
+        padding: 40px 0;
+        font-family: 'Roboto', Arial, sans-serif;
+        color: #101212;
+      }
+
+      .hdx-email .hdx-container {
+        max-width: 658px;
+        margin: 0 auto;
+        padding: 0;
+        background-color: #ffffff;
+      }
+
+      .hdx-email .hdx-space {
+        padding: 48px;
+      }
+
+      .hdx-email .hdx-content p {
+        font-size: 16px;
+        line-height: 140%;
+        margin-top: 0;
+        margin-bottom: 15px;
+      }
+
+      .hdx-email .hdx-content ol, .hdx-content ul {
+        padding-left: 24px;
+        margin-bottom: 15px;
+      }
+
+      .hdx-email .hdx-content li {
+        font-size: 16px;
+        line-height: 130%;
+      }
+
+      .hdx-email .hdx-content a {
+        text-decoration: underline;
+        font-weight: 500;
+        color: #1862d8;
+      }
+
+      .hdx-email .hdx-content .button {
+        display: inline-block;
+        color: #fff;
+        background-color: #1862d8;
+        padding: 8px 12px;
+        border-radius: 2px;
+        font-weight: 500;
+        margin: 16px 0;
+        font-size: 16px;
+        line-height: 1.3;
+        text-decoration: none;
+      }
+
+      .hdx-email .hdx-content .quote {
+        margin-bottom: 15px;
+        margin-left: 16px;
+        padding-left: 8px;
+        border-left: 2px solid #d8e0e1;
+      }
+      .hdx-email .hdx-content .quote p {
+        margin-bottom: 0;
+        line-height: 130%;
+      }
+
+      .hdx-email .hdx-logo {
+        padding: 20px 24px;
+        background-color: #18614c;
+      }
+
+      .hdx-email .hdx-logo a {
+        display: block;
+        text-decoration: none;
+      }
+
+      .hdx-email .hdx-logo img {
+        width: 72px;
+        height: 24px;
+        display: block;
+      }
+
+      .hdx-email .hdx-footer {
+        background-color: #fafbfb;
+        padding: 32px;
+        margin-top: 32px;
+        color: #101212;
+      }
+
+      .hdx-email .hdx-footer a {
+        color: #101212;
+        text-decoration: underline;
+      }
+
+      .hdx-email .hdx-footer .social-icon {
+        text-decoration: none;
+      }
+
+      .hdx-email .hdx-footer img {
+        max-width: 18px;
+        height: auto;
+        margin-right: 5px;
+        margin-top: 32px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+
+      .hdx-email .hdx-footer p {
+        font-size: 14px;
+        line-height: 130%;
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+
+      .hdx-email .hdx-unsubscribe {
+        margin-top: 32px;
+        color: #101212;
+      }
+
+      .hdx-email .hdx-unsubscribe a {
+        color: #101212;
+        text-decoration: underline;
+        font-weight: 500;
+      }
+
+      .hdx-email .hdx-unsubscribe p {
+        font-size: 14px;
+        line-height: 130%;
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+
+      .hdx-email .hdx-unsubscribe {
+        margin-top: 16px;
+      }
+
+      @media (max-width: 678px) {
+        .hdx-email {
+          background-color: #fff !important;
+          padding: 0 !important;
+        }
+
+        .hdx-email .hdx-container {
+          max-width: 100% !important;
+        }
+
+        .hdx-email .hdx-space {
+          padding: 32px !important;
+        }
+
+        .hdx-email .hdx-logo {
+          background-color: #18614c !important;
+        }
+
+        .hdx-email .hdx-logo a {
+          width: 72px !important;
+          overflow: hidden !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hdx-email">
+      <div class="hdx-container">
+        <div class="hdx-logo">
+          <a href="https://data.humdata.org?_came_from=notification_platform_email" target="_blank">
+            <img src="https://data.humdata.org/images/homepage/logo-hdx.png?v2=true" alt="HDX">
+          </a>
+        </div>
+        {{content}}
+      </div>
+    </div>
+  </body>
+</html>

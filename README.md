@@ -110,3 +110,20 @@ The platform uses environment variables for configuration. Key settings include:
 - Novu API credentials
 - Worker enable/disable flag
 
+
+### Dataset event aggregation
+
+By default the listener stores dataset events in the `pending_dataset_event` table and sends one notification per
+subscriber per dataset update run, using the `dataset-notification-v3` Novu workflow, which must exist in Novu.
+Each listener checks for datasets ready to send every 120 s.
+With aggregation disabled, every notifying dataset event triggers `dataset-notification-v2` once per subscriber.
+See [specs/dataset-notifications.md](specs/dataset-notifications.md) and
+[docs/novu-event-aggregation-plan.md](docs/novu-event-aggregation-plan.md).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DATASET_EVENT_AGGREGATION_ENABLED` | `true` | `false` to send one notification per event instead (temporary, for the rollout) |
+| `DATASET_EVENT_QUIET_PERIOD_SECONDS` | `300` | a dataset is sent once it has had no new events for this long |
+| `DATASET_EVENT_MAX_WAIT_SECONDS` | `1800` | ... or once its oldest pending event is this old |
+
+The Novu email templates are versioned in `novu_templates/`.
