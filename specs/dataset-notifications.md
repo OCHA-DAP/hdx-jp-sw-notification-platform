@@ -48,28 +48,28 @@ Status: `[x]` implemented, `[ ]` planned / not yet implemented.
 
 ### Aggregation of dataset events
 
-- [ ] **DATASET_NOTIFICATIONS-010** — Aggregation is controlled by `DATASET_EVENT_AGGREGATION_ENABLED`, default `false`. With it off, dataset events behave exactly as in -008.
-- [ ] **DATASET_NOTIFICATIONS-011** — With aggregation on, a dataset event that would notify under -002 to -006 is stored in the Postgres table `pending_dataset_event` (`id`, `dataset_id`, `event` as JSONB, `received_at` defaulting to the database's `now()`) instead of triggering Novu.
-- [ ] **DATASET_NOTIFICATIONS-012** — A dataset's pending events become due when its newest `received_at` is at least `DATASET_EVENT_QUIET_PERIOD_SECONDS` (default 300) ago, or its oldest at least `DATASET_EVENT_MAX_WAIT_SECONDS` (default 1800) ago, measured with the database clock.
-- [ ] **DATASET_NOTIFICATIONS-013** — Each listener instance attempts a flush at most once every `LISTENER_READ_BLOCK_MS` (default 30000), including when no stream events arrive.
-- [ ] **DATASET_NOTIFICATIONS-014** — A flush claims all due datasets' events in one transaction: it takes the advisory lock `pg_try_advisory_xact_lock(FLUSH_LOCK_KEY)`, deletes the due rows with `DELETE … RETURNING`, and commits before any Novu call. If the lock is held by another instance, the flush skips that round without waiting.
-- [ ] **DATASET_NOTIFICATIONS-015** — Each buffered event is part of at most one Novu trigger per subscriber. A crash after the claim's commit may lose that group for subscribers not yet triggered (at-most-once).
-- [ ] **DATASET_NOTIFICATIONS-016** — For each claimed dataset, the flush looks up the current subscribers and triggers `NOVU_AGGREGATED_DATASET_WORKFLOW_ID` (default `dataset-notification-v3`) once per subscriber. A failure for one dataset is logged and does not stop the others.
-- [ ] **DATASET_NOTIFICATIONS-017** — Within a claimed group, when a resource has a `resource-deleted` event, all of that resource's events with an earlier `event_time` are dropped. If those include its `resource-created`, the delete is dropped as well. Events are matched by `resource_id` and ordered by `event_time`; events without a `resource_id` are kept.
-- [ ] **DATASET_NOTIFICATIONS-018** — After -017, the group's changes are de-duplicated on `(email_event_type, resource_id)`.
-- [ ] **DATASET_NOTIFICATIONS-019** — A dataset whose changes are empty after -017 and -018 triggers nothing; its claimed rows are still removed.
-- [ ] **DATASET_NOTIFICATIONS-020** — The aggregated payload contains:
+- [x] **DATASET_NOTIFICATIONS-010** — Aggregation is controlled by `DATASET_EVENT_AGGREGATION_ENABLED`, default `true`; only the exact value `false` turns it off. With it off, dataset events behave exactly as in -008. The flag is temporary, for the rollout (see Notes).
+- [x] **DATASET_NOTIFICATIONS-011** — With aggregation on, a dataset event that would notify under -002 to -006 is stored in the Postgres table `pending_dataset_event` (`id`, `dataset_id`, `event` as JSONB, `received_at` defaulting to the database's `now()`) instead of triggering Novu.
+- [x] **DATASET_NOTIFICATIONS-012** — A dataset's pending events become due when its newest `received_at` is at least `DATASET_EVENT_QUIET_PERIOD_SECONDS` (default 300) ago, or its oldest at least `DATASET_EVENT_MAX_WAIT_SECONDS` (default 1800) ago, measured with the database clock.
+- [x] **DATASET_NOTIFICATIONS-013** — Each listener instance attempts a flush at most once every 120 s, including when no stream events arrive. The interval is a code constant, chosen to match the stream read wait (-025), so an idle listener checks as often as a busy one.
+- [x] **DATASET_NOTIFICATIONS-014** — A flush claims all due datasets' events in one transaction: it takes the advisory lock `pg_try_advisory_xact_lock(FLUSH_LOCK_KEY)`, deletes the due rows with `DELETE … RETURNING`, and commits before any Novu call. If the lock is held by another instance, the flush skips that round without waiting.
+- [x] **DATASET_NOTIFICATIONS-015** — Each buffered event is part of at most one Novu trigger per subscriber. A crash after the claim's commit may lose that group for subscribers not yet triggered (at-most-once).
+- [x] **DATASET_NOTIFICATIONS-016** — For each claimed dataset, the flush looks up the current subscribers and triggers the `dataset-notification-v3` workflow once per subscriber. The workflow name is a code constant, like the v2 and collection workflow names. A failure for one dataset is logged and does not stop the others.
+- [x] **DATASET_NOTIFICATIONS-017** — Within a claimed group, when a resource has a `resource-deleted` event, all of that resource's events with an earlier `event_time` are dropped. If those include its `resource-created`, the delete is dropped as well. Events are matched by `resource_id` and ordered by `event_time`; events without a `resource_id` are kept.
+- [x] **DATASET_NOTIFICATIONS-018** — After -017, the group's changes are de-duplicated on `(email_event_type, resource_id)`.
+- [x] **DATASET_NOTIFICATIONS-019** — A dataset whose changes are empty after -017 and -018 triggers nothing; its claimed rows are still removed.
+- [x] **DATASET_NOTIFICATIONS-020** — The aggregated payload contains:
   - `event`: `dataset_name`, `dataset_title`, `org_title`, `org_name`, `org_id`, `dataset_id` and `initiator_user_name` from the group's latest event, and `event_time` from its earliest event;
   - `changes[]`: `{email_event_type, resource_name, resource_id}` per change;
   - `hdx_url`, `unsubscribe_token_key` and `dataset_id`, in the same format as -008.
-- [ ] **DATASET_NOTIFICATIONS-021** — Triggers carry no custom `transactionId`; Novu generates it, as today.
-- [ ] **DATASET_NOTIFICATIONS-022** — Flushes run whether or not aggregation is enabled, so rows left after disabling it are still sent.
-- [ ] **DATASET_NOTIFICATIONS-023** — Each flush logs the number of claimed events, the number of pending events, and the age of the oldest pending event.
+- [x] **DATASET_NOTIFICATIONS-021** — Triggers carry no custom `transactionId`; Novu generates it, as today.
+- [x] **DATASET_NOTIFICATIONS-022** — Flushes run whether or not aggregation is enabled, so rows left after disabling it are still sent.
+- [x] **DATASET_NOTIFICATIONS-023** — Each flush logs the number of claimed events, the number of pending events, and the age of the oldest pending event.
 
 ### Listener runtime
 
-- [ ] **DATASET_NOTIFICATIONS-024** — At startup the listener creates missing tables in one transaction holding `pg_advisory_xact_lock(INIT_LOCK_KEY)`, so instances starting together don't race.
-- [ ] **DATASET_NOTIFICATIONS-025** — The listener reads the stream with its own loop using `read_hdx_event(block=LISTENER_READ_BLOCK_MS)` instead of `hdx_listen`. It keeps the current limit of 10,000 reads and the current behaviour of exiting the loop on an unhandled error.
+- [x] **DATASET_NOTIFICATIONS-024** — `init_db()` creates missing tables in one transaction holding `pg_advisory_xact_lock(INIT_LOCK_KEY)`, so processes starting together don't race. The listener calls it at startup; `sync.py` already calls it.
+- [x] **DATASET_NOTIFICATIONS-025** — The listener reads the stream with its own loop using `read_hdx_event()` instead of `hdx_listen`. It keeps hdx-redis-lib's default read wait (120 s), the current limit of 10,000 reads, and the current behaviour of exiting the loop on an unhandled error.
 
 ### Email templates
 
@@ -77,7 +77,7 @@ Status: `[x]` implemented, `[ ]` planned / not yet implemented.
 
 ### Novu requests
 
-- [ ] **DATASET_NOTIFICATIONS-027** — Every Novu API request the listener makes, for both legacy (-007, -008) and aggregated (-016) triggers, uses `timeout=(10, 60)`: at most 10 s to connect and at most 60 s between bytes of the response. A timeout is logged and that trigger is dropped without retry, like any other failed Novu request.
+- [x] **DATASET_NOTIFICATIONS-027** — Every Novu API request the listener makes, for both legacy (-007, -008) and aggregated (-016) triggers, uses `timeout=(10, 60)`: at most 10 s to connect and at most 60 s between bytes of the response. A timeout is logged and that trigger is dropped without retry, like any other failed Novu request.
 
 ## Notes / open questions
 
@@ -90,3 +90,5 @@ Status: `[x]` implemented, `[ ]` planned / not yet implemented.
 - -015 is at-most-once by design, matching the stream: `hdx-redis-lib` acks each message before the listener processes it. The rationale is in the plan, under "Why the Novu calls happen after the commit".
 - Possible typo in `novu_templates/dataset-notification-v2.html.liquid`: `split: '','` (extra `'`). Check it against the live Novu template; v3 (-026) uses the correct form.
 - `FLUSH_LOCK_KEY` and `INIT_LOCK_KEY` are code constants, not configuration.
+- **Deploy order (-010 defaults to on):** the `dataset-notification-v3` workflow must exist in Novu in each environment before this code is deployed there, unless that environment sets `DATASET_EVENT_AGGREGATION_ENABLED=false`. Otherwise aggregated triggers go to a missing workflow. To roll back, set it to `false`.
+- **Follow-up after the rollout:** once v3 has run well in prod, remove `DATASET_EVENT_AGGREGATION_ENABLED` (-010) and the per-event v2 path (-008), so that aggregation is always on. This needs its own spec change: -008 becomes removed and -010 is replaced.

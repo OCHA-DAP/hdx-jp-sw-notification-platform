@@ -24,6 +24,9 @@ class Config:
     HDX_NOTIFICATIONS_SUBCRIPTION_LIST_URL: str
     HDX_NOTIFICATIONS_GROUPED_SUBCRIPTION_LIST_URL: str
     HDX_DATASETS_IDS_BY_OBJECT_URL: str
+    DATASET_EVENT_AGGREGATION_ENABLED: bool
+    DATASET_EVENT_QUIET_PERIOD_SECONDS: int
+    DATASET_EVENT_MAX_WAIT_SECONDS: int
 
 
 CONFIG = None
@@ -58,6 +61,11 @@ def get_config() -> Config:
             HDX_DATASETS_IDS_BY_OBJECT_URL=os.getenv(
                 'HDX_DATASETS_IDS_BY_OBJECT_URL', '/api/3/action/hdx_search_by_object'
             ),
+            # Aggregation of dataset events into one Novu trigger per subscriber per update run
+            # (DATASET_NOTIFICATIONS-010, -012). On unless explicitly set to 'false'.
+            DATASET_EVENT_AGGREGATION_ENABLED=os.getenv('DATASET_EVENT_AGGREGATION_ENABLED', 'true') != 'false',
+            DATASET_EVENT_QUIET_PERIOD_SECONDS=int(os.getenv('DATASET_EVENT_QUIET_PERIOD_SECONDS', '300')),
+            DATASET_EVENT_MAX_WAIT_SECONDS=int(os.getenv('DATASET_EVENT_MAX_WAIT_SECONDS', '1800')),
         )
 
     return CONFIG

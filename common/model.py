@@ -1,6 +1,11 @@
 
-from sqlalchemy import Column, Index, UnicodeText, ForeignKey, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from datetime import timedelta
+from typing import List, Optional, Tuple
+
+from sqlalchemy import BigInteger, Column, DateTime, Index, UnicodeText, ForeignKey, UniqueConstraint, delete, func, \
+    or_, select
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.engine import Row
 from sqlalchemy.orm import relationship
 import uuid
 
@@ -170,6 +175,72 @@ class Subscription(Base):
         ).all()
 
         return [user_id[0] for user_id in user_ids]
+
+
+# Key of the transaction-scoped advisory lock that lets only one listener instance claim pending events
+# at a time (DATASET_NOTIFICATIONS-014). Any constant works, as long as nothing else in this database
+# uses the same key.
+FLUSH_LOCK_KEY = 4_170_001
+
+
+class PendingDatasetEvent(Base):
+    """
+    Dataset events waiting to be sent to Novu as one aggregated notification per dataset
+    (DATASET_NOTIFICATIONS-011). Rows are deleted when they are claimed, so the table is a queue.
+    """
+    __tablename__ = 'pending_dataset_event'
+
+    id = Column('id', BigInteger, primary_key=True, autoincrement=True)
+    dataset_id = Column('dataset_id', UnicodeText, nullable=False)
+    event = Column('event', JSONB, nullable=False)
+    # Database clock, so that all listener instances measure the debounce windows the same way
+    received_at = Column('received_at', DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('ix_pending_dataset_event_dataset_id_received_at', 'dataset_id', 'received_at'),
+    )
+
+    def __init__(self, dataset_id, event):
+        self.dataset_id = dataset_id
+        self.event = event
+
+    @classmethod
+    def add(cls, session, dataset_id, event):
+        session.add(cls(dataset_id=dataset_id, event=event))
+
+    @classmethod
+    def claim_due(cls, session, quiet_period_seconds: int, max_wait_seconds: int) -> Optional[List[Row]]:
+        """
+        Deletes and returns the pending events of every dataset that is due (DATASET_NOTIFICATIONS-012):
+        its newest event is at least `quiet_period_seconds` old, or its oldest at least `max_wait_seconds`.
+
+        Returns None, without waiting, when another instance holds the flush lock
+        (DATASET_NOTIFICATIONS-014). The caller must commit, which also releases the lock.
+        """
+        locked = session.execute(select(func.pg_try_advisory_xact_lock(FLUSH_LOCK_KEY))).scalar()
+        if not locked:
+            return None
+
+        due_dataset_ids = select(cls.dataset_id).group_by(cls.dataset_id).having(
+            or_(
+                func.max(cls.received_at) <= func.now() - timedelta(seconds=quiet_period_seconds),
+                func.min(cls.received_at) <= func.now() - timedelta(seconds=max_wait_seconds),
+            )
+        )
+        claimed = session.execute(
+            delete(cls)
+            .where(cls.dataset_id.in_(due_dataset_ids))
+            .returning(cls.id, cls.dataset_id, cls.event, cls.received_at)
+        )
+        return claimed.all()
+
+    @classmethod
+    def get_pending_stats(cls, session) -> Tuple[int, Optional[timedelta]]:
+        """Number of pending events, and the age of the oldest one (None when there are none)."""
+        count, oldest_age = session.execute(
+            select(func.count(cls.id), func.now() - func.min(cls.received_at))
+        ).one()
+        return count, oldest_age
 
 
 # Keep DatasetToUser for backward compatibility during transition

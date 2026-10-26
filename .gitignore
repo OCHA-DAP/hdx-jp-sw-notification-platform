@@ -9,3 +9,4 @@ dist/
 
 .local.codespace.env
 bootstrap.codespace.sh
+.env.codespace

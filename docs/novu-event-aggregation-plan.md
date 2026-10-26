@@ -37,7 +37,7 @@ stream event ─► process() ─► _handle_dataset_event
                                ├─ no subscribers → skip                                 (unchanged)
                                ├─ flag OFF → legacy per-event trigger to v2             (unchanged)
                                └─ flag ON  → INSERT into pending_dataset_event; COMMIT
-listener loop, every ≤30s, on each of the 3 instances ─► flush_due_dataset_events()
+listener loop, every ≤120s, on each of the 3 instances ─► flush_due_dataset_events()
       1. claim  (one short transaction: flush-lock try + one DELETE … RETURNING; COMMIT)
       2. send   (no transaction: per claimed dataset → subscribers → one v3 trigger each)
 ```
@@ -126,7 +126,7 @@ Why each piece is there:
 | `now()` from Postgres on both sides | `received_at` (column default) and the due check use one clock, so there is no skew between the 3 containers. | Clock skew between containers shifts quiet periods. |
 | Commit before sending | The lock and the transaction last milliseconds. A slow or hung Novu never holds Postgres resources or blocks other flushers. | See [Why the Novu calls happen after the commit](#why-the-novu-calls-happen-after-the-commit). |
 
-Throughput is not a concern: the lock is held for one indexed `DELETE`. With 3 instances each trying every ≤30s, some instance runs a claim about every 10s.
+Throughput is not a concern: the lock is held for one indexed `DELETE`. With 3 instances each trying every ≤120s, some instance runs a claim about every 40s. A dataset is therefore sent up to ~2 minutes after it becomes due, which is negligible next to Novu's 2h delay.
 
 ### Why an advisory lock rather than a table lock
 
@@ -154,7 +154,7 @@ The alternative is to claim, send to every subscriber, and only then commit. The
    - The send takes ~55 calls per due dataset, and possibly several datasets per claim: seconds, sometimes minutes.
    - All due groups queue behind it, so notifications to unrelated datasets are delayed.
 4. **One hung Novu call would stop flushing everywhere.**
-   - Today the calls have no timeout. Even with the planned `timeout=(5, 30)`, 55 slow calls add up to minutes.
+   - Today the calls have no timeout. Even with the `timeout=(10, 60)` now added, 55 slow calls add up to minutes.
    - During that time the transaction stays open and keeps the lock, so no instance can flush.
 5. **Long-open transactions are bad for the whole database.**
    - An open transaction stops Postgres from cleaning up dead rows (vacuum), not only in this table, which is rewritten constantly, but across the database. That includes the `subscription` tables that `sync.py` updates.
@@ -216,7 +216,7 @@ flowchart LR
 |---|---|---|---|---|
 | P1 | Between insert and claim | An event belonging to the same run is committed after the claim statement started, e.g. the run paused for more than the quiet period, ran longer than the max wait, or a listener lagged. It starts a new group. | **Cost only**: an extra trigger, never a duplicate or loss. | A 5 min quiet period is far longer than the gaps inside a run (< 1 min on Oct 4). Tune `DATASET_EVENT_QUIET_PERIOD_SECONDS` if logs show splits. |
 | P2 | After the claim's COMMIT | The instance crashes while sending. Rows are already deleted, so subscribers not yet triggered miss this group. | **Loss**, limited to the seconds a send takes. This is the same class of risk as today: the stream already acks before processing. | Accepted. Sending inside the transaction would turn this loss into duplicates and cause other problems; see [Why the Novu calls happen after the commit](#why-the-novu-calls-happen-after-the-commit). |
-| P3 | During sends | A Novu call hangs. There is no timeout today. | That instance stops reading and flushing. The lock is already released, so the other 2 keep flushing. | **Add `timeout=(5, 30)`** to the Novu requests (Changes §6). |
+| P3 | During sends | A Novu call hangs. There is no timeout today. | That instance stops reading and flushing. The lock is already released, so the other 2 keep flushing. | **Add `timeout=(10, 60)`** to all Novu requests (Changes §6). |
 | P4 | During sends | Novu returns an error. | The subscriber misses that group. The error is logged, as today. | Unchanged from today. A retry can be added later if needed. |
 | P5 | Waiting | All instances are down or the flush keeps failing. | Rows accumulate and are **not lost**; they flush when an instance recovers. After a long outage the first claim may return many rows. | Log the pending row count and the age of the oldest row on each flush. |
 | P6 | Startup | 3 instances call `create_all` at once on a deploy and race on table creation. | A startup error. | Run `create_all` inside a transaction that holds `pg_advisory_xact_lock(INIT_LOCK_KEY)` (Changes §7). |
@@ -428,16 +428,18 @@ There is a possible typo in the v2 template, in `{% assign updated_names = '' | 
   - index `(dataset_id, received_at)`.
 - Classmethods, following the existing `Subscription` style:
   - `add(session, dataset_id, event)`;
-  - `claim_due(session, quiet_period_s, max_wait_s)`: runs the try-lock and the `DELETE … RETURNING` from [The claim](#the-claim). It returns the claimed rows, or `[]` if the lock is busy. The caller commits.
+  - `claim_due(session, quiet_period_s, max_wait_s)`: runs the try-lock and the `DELETE … RETURNING` from [The claim](#the-claim). It returns the claimed rows (possibly `[]`), or `None` if the lock is busy. The caller commits.
 
 ### 2. `config/config.py`: new settings (env vars)
 | Setting | Default |
 |---|---|
-| `DATASET_EVENT_AGGREGATION_ENABLED` | `false`, so existing tests and behaviour are unchanged until it is switched on |
+| `DATASET_EVENT_AGGREGATION_ENABLED` | `true`; only the exact value `false` turns it off. Temporary, for the rollout. |
 | `DATASET_EVENT_QUIET_PERIOD_SECONDS` | `300` |
 | `DATASET_EVENT_MAX_WAIT_SECONDS` | `1800`, so a dataset that never goes quiet cannot be held forever |
-| `NOVU_AGGREGATED_DATASET_WORKFLOW_ID` | `dataset-notification-v3` |
-| `LISTENER_READ_BLOCK_MS` | `30000`, which sets how often each instance tries to flush |
+
+Not configurable, by design:
+- the v3 workflow name, `dataset-notification-v3`, is a constant in `novu.py`, like the v2 and collection workflow names;
+- the flush interval, 120 s, is a constant in `stream_loop.py` (see §7).
 
 The two advisory lock keys (`FLUSH_LOCK_KEY` and `INIT_LOCK_KEY`) are constants in code.
 
@@ -488,18 +490,19 @@ In `_handle_dataset_event`, after the existing checks and the subscriber lookup:
 - otherwise keep the existing legacy path unchanged.
 
 ### 6. `listener_processing/novu.py`
-- Extract the duplicated request code into `_trigger_workflow_for_user(workflow_id, user_id, payload)`. The two existing `push_*` functions call it.
-- Add `timeout=(5, 30)` to that request (P3). This also protects the legacy path.
-- Add `send_aggregated_dataset_notifications(user_ids, payload)`.
+Kept to the smallest diff, as AGENTS.md asks:
+- `push_dataset_notification_to_user` gets a `workflow_id` parameter, defaulting to `dataset-notification-v2`.
+- `send_notifications_to_users` gets a `dataset_workflow_id` parameter with the same default and passes it on.
+- All Novu requests get `timeout=NOVU_REQUEST_TIMEOUT`, which is `(10, 60)` (P3, DATASET_NOTIFICATIONS-027). This also changes the legacy path: a hung call now fails and is logged instead of blocking forever.
 - The legacy v2 payload stays byte-for-byte the same.
 
 ### 7. `run.py`: own read loop instead of `hdx_listen`
-- At startup, create missing tables inside one transaction that first takes `pg_advisory_xact_lock(INIT_LOCK_KEY)` (blocking), so the 3 instances don't race (P6). The listener must not depend on the separate sync process having created the new table.
-- Run this loop until `max_iterations` (10,000) is reached:
-  - `event = event_bus.read_hdx_event(block=LISTENER_READ_BLOCK_MS)`;
+- At startup, call `init_db()` (`common/db_utils.py`), which now creates missing tables inside one transaction that first takes `pg_advisory_xact_lock(INIT_LOCK_KEY)` (blocking). The 3 instances, and `sync.py`, which also calls `init_db()`, therefore don't race (P6). The listener must not depend on the separate sync process having created the new table.
+- The loop lives in the new `listener_processing/stream_loop.py` (`listen()`), because `run.py` fetches the object lists at import time and can't be imported by tests. It runs until `max_iterations` (10,000) is reached:
+  - `event = event_bus.read_hdx_event()`, keeping hdx-redis-lib's default read wait of 120 s, as today;
   - filter on `event_type in ALLOWED_EVENT_TYPES`, which replaces `hdx_listen`'s pre-filter;
   - call the existing `event_processor(event)`;
-  - every ≥ `LISTENER_READ_BLOCK_MS`, measured with a monotonic clock, call `flush_due_dataset_events(db_session())`.
+  - every ≥ `FLUSH_INTERVAL_SECONDS` (120 s), measured with a monotonic clock, call `flush_due_dataset_events(db_session())`. The interval matches the read wait: an idle read returns after 120 s, so an idle listener checks as often as a busy one. A shorter interval would only be honoured while events are flowing.
 - Keep the current error behaviour: log, leave the loop, and let the container restart. Buffered rows survive in Postgres.
 
 ### 8. Novu dashboard (outside the repo)
@@ -528,32 +531,34 @@ One v3 event now covers a whole run, so the per-resource columns need a small ch
 v2 events keep the existing logic, so days before and after the rollout can still be compared.
 
 ## Tests
-- **New `tests/test_aggregation.py`** (real Postgres; mock `requests.request`, as the existing tests do; set `received_at` explicitly in the past to simulate time):
-  - with the flag on, a worthy event with subscribers buffers 1 row and sends no HTTP request;
-  - non-worthy events, skip-list events, events without subscribers and disabled objects create no row;
-  - nothing is claimed before the quiet period; a claim happens after it; a claim happens after the max wait even if the latest row is fresh;
-  - a flush sends one request per subscriber to `dataset-notification-v3` with N changes, and the rows are gone;
-  - two due datasets in one claim produce separate triggers;
-  - a group whose only changes are a resource created and then deleted sends no trigger, and its rows are still removed;
-  - the payload contains only the fields in [The v3 payload](#the-v3-payload-only-what-the-template-needs), and repeated `(email_event_type, resource_id)` pairs appear once;
-  - **concurrency**, using two separate DB sessions:
-    - while session A holds the flush lock (open transaction), `claim_due` on session B returns `[]` at once, without blocking;
-    - session B can insert while A holds the lock;
-    - a row inserted after A's claim is not claimed by A and remains pending (P1).
-- **Additions to `tests/test_listener_processing.py`**:
-  - unit tests for `build_changes`: each row of the delete examples table in §3, repeated `(email_event_type, resource_id)` entries appearing once, two resources with the same name kept as two entries, events without `resource_id` kept, and `id` order ignored in favour of `event_time`;
-  - the existing legacy tests stay green because the flag defaults to off.
-- **Run the tests** with `pytest --cov=.` (Postgres from `docker-compose` locally, or the CI services).
+Tests that need no database mock `requests.request` and the model methods, as the existing tests do:
+- `tests/test_helpers.py`: `drop_superseded_by_delete` and `build_changes`. Covers each row of the delete examples table in §3, repeated `(email_event_type, resource_id)` entries appearing once, two resources with the same name kept as two entries, events without `resource_id` kept, and `event_time` order used instead of list order.
+- `tests/test_aggregation.py`: the payload; one trigger per subscriber per dataset to `dataset-notification-v3` with no `transactionId`; the claim committed before any Novu call; separate triggers per dataset; nothing sent for empty changes or no subscribers; skipping when the lock is busy; one dataset's failure not stopping the others; the flush log line.
+- `tests/test_stream_loop.py`: only allowed event types are processed; flushes at most once per `FLUSH_INTERVAL_SECONDS`, even without events; the default read wait is kept; the iteration limit; error handling.
+- `tests/test_novu.py`: the timeout on every Novu request; timeouts logged and dropped; the workflow ID passed through.
+- `tests/test_db_utils.py`: `init_db()` takes the lock before `create_all` in the same transaction.
+- `tests/test_config.py`: defaults and env parsing of the new settings.
+- `tests/test_listener_processing.py`: with the flag on, a notifying event is buffered and not sent; nothing is buffered without subscribers or for skipped events. The legacy tests that expect per-event v2 requests set the flag to `false` explicitly, because it defaults to on.
+
+Tests against the real test Postgres (`db_session_for_testing`) are in `tests/test_model.py`, for `PendingDatasetEvent`. They set `received_at` explicitly in the past to simulate time, and cover:
+- not due before the quiet period; due after it; a recent event keeping the whole dataset waiting; due after the max wait; only due datasets claimed;
+- **concurrency**, using two separate DB sessions:
+  - while one session holds the flush lock, `claim_due` on the other returns `None` at once, without blocking;
+  - the lock is released by commit;
+  - a row inserted while a claim is open is not claimed by it and remains pending (P1);
+- the pending stats.
+
+**Run the tests** with `pytest --cov=.` (Postgres from `docker-compose` locally, or the CI services).
 
 ## Verification and rollout
-1. Merge and deploy with the flag **off**. There is no behaviour change; confirm the `pending_dataset_event` table exists.
-2. Create the v3 workflow and template in Novu dev.
-3. Turn the flag on in dev or stage. Push synthetic events with `HDXWriteOnlyRedisEventBus.push_hdx_event`: several resource events on one dataset with a test subscriber. Expect 0 triggers until the quiet period ends, then exactly one v3 trigger per subscriber, with every change visible in the Novu activity feed and the email.
-4. Turn the flag on in prod. Watch the flush logs: claimed count, pending count (should hover near 0) and oldest-row age (should stay under the max wait).
+1. Create the v3 workflow and template in Novu, in each environment, **before** deploying there: the flag defaults to on, so the deploy switches dataset notifications to v3. To deploy without switching, set `DATASET_EVENT_AGGREGATION_ENABLED=false` for that environment.
+2. Deploy to dev or stage and confirm the `pending_dataset_event` table exists.
+3. In dev or stage, push synthetic events with `HDXWriteOnlyRedisEventBus.push_hdx_event`: several resource events on one dataset with a test subscriber. Expect 0 triggers until the quiet period ends, then exactly one v3 trigger per subscriber, with every change visible in the Novu activity feed and the email.
+4. Deploy to prod. Watch the flush logs: claimed count, pending count (should hover near 0) and oldest-row age (should stay under the max wait).
 5. **Measure:**
    - Novu workflow runs per day;
    - `novu_probe` (`hdx-notification-platform-stats`, updated as in §10) on a post-rollout day, compared with the 2026-07-30, 09-08 and 10-04 baselines. Expect about −80–90% on bot-heavy days.
-6. **Rollback:** turn the flag off. Pending rows still drain through the flush.
+6. **Rollback:** set `DATASET_EVENT_AGGREGATION_ENABLED=false`. Pending rows still drain through the flush. Once v3 has run well in prod, remove the flag and the v2 path (spec Notes).
 
 ## To verify during implementation
 - That the listener's database credentials may `CREATE TABLE`. The sync process already does this, but it is deployed separately and may use a different database user.
