@@ -1,12 +1,20 @@
 import uuid
 import pytest
 import json
-from mock import patch
+from mock import MagicMock, patch
 
 from common.model import NotifyObject, Subscription
+from config.config import get_config
 from listener_processing.main import process, _handle_collection_event, _handle_dataset_event
 from listener_processing.helpers import EVENT_TYPE_ORG_DATASET_ADDED, EVENT_TYPE_RESOURCE_CREATED, \
     EVENT_TYPE_SPREADSHEET_SHEET_CHANGED
+
+
+@pytest.fixture
+def aggregation_disabled():
+    """Legacy per-event v2 behaviour (DATASET_NOTIFICATIONS-008); aggregation is on by default (-010)."""
+    with patch.object(get_config(), 'DATASET_EVENT_AGGREGATION_ENABLED', False):
+        yield
 
 
 @pytest.fixture
@@ -87,6 +95,7 @@ def create_test_data(session):
 class TestListenerProcessing:
     """Test suite for listener processing logic"""
 
+    @pytest.mark.usefixtures('aggregation_disabled')
     @patch('listener_processing.main.db_session')
     @patch('requests.request')
     def test_process_dataset_event_with_subscribers(
@@ -194,6 +203,7 @@ class TestListenerProcessing:
         # Verify - no notifications should be sent due to skip logic
         mock_send_notifications.assert_not_called()
 
+    @pytest.mark.usefixtures('aggregation_disabled')
     @patch('requests.request')
     def test_handle_dataset_event_directly(
         self,
@@ -338,3 +348,54 @@ class TestListenerProcessing:
         # we should have proceeded past the notification-worthiness check and attempted
         # to look up subscribers
         mock_get_subscribed_users.assert_called_once()
+
+    @patch('requests.request')
+    @patch('listener_processing.main.buffer_dataset_event')
+    @patch('common.model.Subscription.get_users_subscribed_to_object')
+    def test_handle_dataset_event_buffers_when_aggregation_enabled(
+        self,
+        mock_get_subscribed_users,
+        mock_buffer,
+        mock_requests,
+        sample_dataset_event,
+    ):
+        """DATASET_NOTIFICATIONS-010, -011: with aggregation on, a notifying event is buffered, not sent"""
+        mock_get_subscribed_users.return_value = ['user-dataset-123']
+        session = MagicMock()
+
+        with patch.object(get_config(), 'DATASET_EVENT_AGGREGATION_ENABLED', True):
+            _handle_dataset_event(session, sample_dataset_event)
+
+        mock_buffer.assert_called_once_with(session, 'test-dataset-123', sample_dataset_event)
+        mock_requests.assert_not_called()
+
+    @patch('listener_processing.main.buffer_dataset_event')
+    @patch('common.model.Subscription.get_users_subscribed_to_object')
+    def test_handle_dataset_event_does_not_buffer_without_subscribers(
+        self,
+        mock_get_subscribed_users,
+        mock_buffer,
+        sample_dataset_event,
+    ):
+        mock_get_subscribed_users.return_value = []
+
+        with patch.object(get_config(), 'DATASET_EVENT_AGGREGATION_ENABLED', True):
+            _handle_dataset_event(MagicMock(), sample_dataset_event)
+
+        mock_buffer.assert_not_called()
+
+    @patch('listener_processing.main.buffer_dataset_event')
+    @patch('common.model.Subscription.get_users_subscribed_to_object')
+    def test_handle_dataset_event_does_not_buffer_non_notifying_events(
+        self,
+        mock_get_subscribed_users,
+        mock_buffer,
+        sample_dataset_event,
+    ):
+        sample_dataset_event['resource_name'] = 'QuickCharts data.csv'
+
+        with patch.object(get_config(), 'DATASET_EVENT_AGGREGATION_ENABLED', True):
+            _handle_dataset_event(MagicMock(), sample_dataset_event)
+
+        mock_buffer.assert_not_called()
+        mock_get_subscribed_users.assert_not_called()

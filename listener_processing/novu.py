@@ -1,3 +1,4 @@
+import functools
 import logging
 import requests
 import json
@@ -8,6 +9,14 @@ from config.config import get_config
 logger = logging.getLogger(__name__)
 
 config = get_config()
+
+# (connect, read) timeouts in seconds for every Novu request. Without them requests waits forever on a
+# connection that stops responding (DATASET_NOTIFICATIONS-027).
+NOVU_REQUEST_TIMEOUT = (10, 60)
+
+DATASET_NOTIFICATION_WORKFLOW_ID = 'dataset-notification-v2'
+# one notification per subscriber per dataset update run (DATASET_NOTIFICATIONS-016)
+AGGREGATED_DATASET_NOTIFICATION_WORKFLOW_ID = 'dataset-notification-v3'
 
 
 def push_notification_to_novu(data_dict: Dict):
@@ -32,18 +41,19 @@ def push_notification_to_novu(data_dict: Dict):
         'Authorization': f'ApiKey {config.NOVU_API_KEY}'
     }
 
-    response = requests.request('POST', url, headers=headers, data=payload)
+    response = requests.request('POST', url, headers=headers, data=payload, timeout=NOVU_REQUEST_TIMEOUT)
 
     print(response.text)
     logger.info('event pushed to NOVU')
 
 
-def push_dataset_notification_to_user(user_id: str, data_dict: Dict):
+def push_dataset_notification_to_user(user_id: str, data_dict: Dict,
+                                      workflow_id: str = DATASET_NOTIFICATION_WORKFLOW_ID):
     """Send dataset notification directly to a specific user"""
     url = config.NOVU_API_URL
     try:
         payload = json.dumps({
-            'name': 'dataset-notification-v2',
+            'name': workflow_id,
             'to': {
                 'type': 'Subscriber',
                 'subscriberId': user_id
@@ -60,7 +70,7 @@ def push_dataset_notification_to_user(user_id: str, data_dict: Dict):
     }
 
     try:
-        response = requests.request('POST', url, headers=headers, data=payload)
+        response = requests.request('POST', url, headers=headers, data=payload, timeout=NOVU_REQUEST_TIMEOUT)
         response.raise_for_status()
         logger.info(f'Dataset notification sent to user {user_id}')
     except requests.exceptions.RequestException as e:
@@ -89,14 +99,15 @@ def push_collection_notification_to_user(user_id: str, data_dict: Dict):
     }
 
     try:
-        response = requests.request('POST', url, headers=headers, data=payload)
+        response = requests.request('POST', url, headers=headers, data=payload, timeout=NOVU_REQUEST_TIMEOUT)
         response.raise_for_status()
         logger.info(f'Collection notification sent to user {user_id}')
     except requests.exceptions.RequestException as e:
         logger.error(f'Failed to send collection notification to user {user_id}: {e}')
 
 
-def send_notifications_to_users(user_ids: List[str], data_dict: Dict, is_collection_event: bool = False):
+def send_notifications_to_users(user_ids: List[str], data_dict: Dict, is_collection_event: bool = False,
+                                dataset_workflow_id: str = DATASET_NOTIFICATION_WORKFLOW_ID):
     """Send notifications to a list of users"""
     if not user_ids:
         logger.info('No users to notify')
@@ -105,7 +116,7 @@ def send_notifications_to_users(user_ids: List[str], data_dict: Dict, is_collect
     if is_collection_event:
         notification_func = push_collection_notification_to_user
     else:
-        notification_func = push_dataset_notification_to_user
+        notification_func = functools.partial(push_dataset_notification_to_user, workflow_id=dataset_workflow_id)
 
     for user_id in user_ids:
         notification_func(user_id, data_dict)

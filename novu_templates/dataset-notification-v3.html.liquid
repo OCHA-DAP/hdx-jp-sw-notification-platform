@@ -1,0 +1,104 @@
+{% assign token_key = steps.digest-step.events.0.payload.unsubscribe_token_key %}
+
+{% assign created_names = '' | split: ',' %}
+{% assign updated_names = '' | split: ',' %}
+{% assign deleted_names = '' | split: ',' %}
+{% assign sheet_names = '' | split: ',' %}
+
+{% for event in steps.digest-step.events %}
+  {% for change in event.payload.changes %}
+    {% assign resource_name = change.resource_name %}
+    {% if change.email_event_type == 'resource-created' %}
+      {% unless created_names contains resource_name %}
+        {% assign created_names = created_names | push: resource_name %}
+      {% endunless %}
+    {% endif %}
+    {% if change.email_event_type == 'resource-data-changed' %}
+      {% unless updated_names contains resource_name %}
+        {% assign updated_names = updated_names | push: resource_name %}
+      {% endunless %}
+    {% endif %}
+    {% if change.email_event_type == 'resource-deleted' %}
+      {% unless deleted_names contains resource_name %}
+        {% assign deleted_names = deleted_names | push: resource_name %}
+      {% endunless %}
+    {% endif %}
+    {% if change.email_event_type == 'spreadsheet-sheet-updated' %}
+      {% unless sheet_names contains resource_name %}
+        {% assign sheet_names = sheet_names | push: resource_name %}
+      {% endunless %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+
+<div class="hdx-space">
+  <div class="hdx-content">
+    <p>Dear HDX User,</p>
+
+    <p>The <a href="{{payload.hdx_url}}/dataset/{{payload.event.dataset_name}}?_came_from=notification_platform_email&_u={{subscriber.data[token_key]}}" target="_blank" title="Go to the dataset">{{payload.event.dataset_title}}</a> dataset has been updated by {{payload.event.org_title}} on {{payload.event.event_time | date: '%Y-%m-%d'}} at {{payload.event.event_time | date: '%H:%M'}} UTC.</p>
+
+    {% if created_names.size > 0 %}
+    <p>🆕 <strong>The following files have been added:</strong></p>
+    <ul>
+      {% assign sorted_names = created_names | sort %}
+      {% for name in sorted_names %}
+        <li>{{ name }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if updated_names.size > 0 %}
+    <p>✏️ <strong>The following files have been updated:</strong></p>
+    <ul>
+      {% assign sorted_names = updated_names | sort %}
+      {% for name in sorted_names %}
+        <li>{{ name }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if deleted_names.size > 0 %}
+    <p>❌ <strong>The following files have been deleted:</strong></p>
+    <ul>
+      {% assign sorted_names = deleted_names | sort %}
+      {% for name in sorted_names %}
+        <li>{{ name }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if sheet_names.size > 0 %}
+    <p>📄 <strong>The structure of the following spreadsheet files have been changed:</strong></p>
+    <ul>
+      {% assign sorted_names = sheet_names | sort %}
+      {% for name in sorted_names %}
+        <li>{{ name }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <p>
+      Take a quick <a href="{{ env.HDX_FEEDBACK_FORM_URL }}">survey</a> to help us improve these notifications.
+    </p>
+
+    <p>Best wishes,</p>
+
+    <p>The HDX Team<br>
+    Centre for Humanitarian Data<br>
+    United Nations Office for the Coordination of Humanitarian Affairs (OCHA)<br>
+    </p>
+  </div>
+  <div class="hdx-footer">
+    <p>You received this email because you subscribed to email notifications for this dataset on HDX. <a href="https://data.humdata.org?_came_from=notification_platform_email" title="HDX" target="_blank">HDX</a> is a product of the <a href="https://www.unocha.org" title="OCHA" target="_blank">United Nations Office for the Coordination of Humanitarian Affairs</a> (OCHA) - <a href="https://centre.humdata.org/" title="Centre for Humanitarian Data" target="_blank">Centre for Humanitarian Data</a>. Keep in touch by <a href="https://twitter.com/humdata" title="X" target="_blank">following us on X</a> or <a href="{{ env.HDX_NEWSLETTER_SIGNUP_URL }}" title="MailChimp" target="_blank">signing up for our mailing list</a>.</p>
+    <a href="https://twitter.com/humdata" title="X" class="social-icon" target="_blank">
+      <img src="https://data.humdata.org/images/homepage/social-x.png" alt="X">
+    </a>
+    <a href="https://linkedin.com/company/ocha-centre-for-humanitarian-data" class="social-icon" title="LinkedIn" target="_blank">
+      <img src="https://data.humdata.org/images/homepage/social-linkedin.png" alt="LinkedIn">
+    </a>
+  </div>
+  <div class="hdx-unsubscribe">
+    <p><a href="{{payload.hdx_url}}/dataset/{{payload.event.dataset_name}}?_came_from=notification_platform_email&_unsubscribe_token={{subscriber.data[token_key]}}" target="_blank" title="Unsubscribe">Unsubscribe</a> from these emails.</p>
+    <p>To manage your subscriptions, <a href="{{payload.hdx_url}}/user/notifications/{{subscriber.subscriberId}}?_came_from=notification_platform_email" title="HDX log in" target="_blank">log in</a> to your HDX account or <a href="{{payload.hdx_url}}/signup/user-info/?_came_from=notification_platform_email&s_email_address={{subscriber.email | url_encode}}" title="HDX sign up" target="_blank">create a new one</a>.</p>
+  </div>
+</div>

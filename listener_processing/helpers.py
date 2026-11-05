@@ -1,6 +1,7 @@
+import datetime
 import logging
 import time
-from typing import Dict
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,85 @@ def get_email_event_type(event: Dict) -> str:
     }:
         return 'spreadsheet-sheet-updated'
     return event_type
+
+
+def get_unsubscribe_token_key(dataset_id: str) -> str:
+    return f'unsubscribe_token_{dataset_id.replace("-", "_")}'
+
+
+def get_event_time(event: Dict) -> datetime.datetime:
+    """The event's `event_time` as a datetime, for ordering. Missing or unparsable values sort first."""
+    try:
+        event_time = datetime.datetime.fromisoformat(event.get('event_time'))
+    except (TypeError, ValueError):
+        return datetime.datetime.min
+    if event_time.tzinfo:
+        # compare everything as naive UTC; HDX sends naive UTC timestamps
+        event_time = event_time.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+    return event_time
+
+
+def drop_superseded_by_delete(events: List[Dict]) -> List[Dict]:
+    """
+    Removes the events of a deleted resource that happened before its (latest) deletion, so that subscribers
+    aren't told a file was added or updated when it no longer exists. If the resource was also created before
+    that deletion, the deletion is removed as well: the file appeared and disappeared within the same group,
+    so subscribers never knew about it (DATASET_NOTIFICATIONS-017).
+
+    Events are matched by `resource_id` and ordered by `event_time`. Events without a `resource_id` are kept.
+    """
+    latest_delete_times = {}
+    for event in events:
+        resource_id = event.get('resource_id')
+        if resource_id and event.get('event_type') == EVENT_TYPE_RESOURCE_DELETED:
+            event_time = get_event_time(event)
+            if resource_id not in latest_delete_times or event_time > latest_delete_times[resource_id]:
+                latest_delete_times[resource_id] = event_time
+
+    created_before_delete = {
+        event['resource_id'] for event in events
+        if event.get('resource_id') in latest_delete_times
+        and event.get('event_type') == EVENT_TYPE_RESOURCE_CREATED
+        and get_event_time(event) < latest_delete_times[event['resource_id']]
+    }
+
+    kept = []
+    for event in events:
+        resource_id = event.get('resource_id')
+        if resource_id not in latest_delete_times:
+            kept.append(event)
+            continue
+        event_time = get_event_time(event)
+        delete_time = latest_delete_times[resource_id]
+        if event_time < delete_time:
+            continue
+        if event_time == delete_time and event.get('event_type') == EVENT_TYPE_RESOURCE_DELETED \
+                and resource_id in created_before_delete:
+            continue
+        kept.append(event)
+    return kept
+
+
+def build_changes(events: List[Dict]) -> List[Dict]:
+    """
+    The `changes` list of an aggregated notification: one entry per (email event type, resource), after applying
+    deletions (DATASET_NOTIFICATIONS-017, -018). `events` should be in chronological order; the email template
+    sorts the names itself.
+    """
+    changes = []
+    seen = set()
+    for event in drop_superseded_by_delete(events):
+        email_event_type = get_email_event_type(event)
+        key = (email_event_type, event.get('resource_id'))
+        if key in seen:
+            continue
+        seen.add(key)
+        changes.append({
+            'email_event_type': email_event_type,
+            'resource_name': event.get('resource_name'),
+            'resource_id': event.get('resource_id'),
+        })
+    return changes
 
 def do_nothing_for_ever():
     while True:
