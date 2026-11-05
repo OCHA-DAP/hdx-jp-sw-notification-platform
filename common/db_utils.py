@@ -38,12 +38,25 @@ def commit_db_changes():
 def end_db_session():
     end_session()
 
+# Key of the advisory lock that serializes table creation when several processes start together, e.g. the
+# listener instances and sync (DATASET_NOTIFICATIONS-024). Any constant works, as long as nothing else in this
+# database uses the same key.
+INIT_LOCK_KEY = 4_170_002
+
+
 def init_db():
+    """
+    Creates missing tables. Safe to run from several processes at once: concurrent create_all() calls can fail, so
+    they are serialized by a transaction-scoped advisory lock, released when the transaction ends.
+    """
     global _engine
     if _engine is None:
         _engine = create_engine(DATABASE_URL)
-    Base.metadata.create_all(bind=_engine)
+    with _engine.begin() as connection:
+        connection.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': INIT_LOCK_KEY})
+        Base.metadata.create_all(bind=connection)
     print('DB initialized')
+
 
 def test_db():
     global _engine

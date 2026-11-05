@@ -7,9 +7,11 @@ import json  # noqa
 from hdx_redis_lib import connect_to_hdx_event_bus_with_env_vars  # noqa
 from config.config import get_config  # noqa
 from listener_processing.objects import get_objects_with_notifications, get_objects_without_notifications  # noqa
-from listener_processing.helpers import ALLOWED_EVENT_TYPES  # noqa
 from listener_processing.helpers import do_nothing_for_ever  # noqa
 from listener_processing.main import process, is_cached_expired  # noqa
+from listener_processing.aggregation import flush_due_dataset_events  # noqa
+from listener_processing.stream_loop import listen  # noqa
+from common.db_utils import db_session, init_db  # noqa
 
 
 
@@ -48,8 +50,12 @@ if __name__ == '__main__':
             return True, 'Success'
 
 
+        # Create missing tables, e.g. pending_dataset_event, without depending on the sync process
+        init_db()
+
         # Connect to Redis
         event_bus = connect_to_hdx_event_bus_with_env_vars()
         logger.info('Connected to Redis')
 
-        event_bus.hdx_listen(event_processor, allowed_event_types=ALLOWED_EVENT_TYPES, max_iterations=10_000)
+        listen(event_bus, event_processor, flush=lambda: flush_due_dataset_events(db_session()),
+               max_iterations=10_000)

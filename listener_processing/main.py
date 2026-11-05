@@ -2,8 +2,9 @@ import logging
 import datetime
 from typing import Dict, Set, List
 
+from listener_processing.aggregation import buffer_dataset_event
 from listener_processing.helpers import COLLECTION_EVENT_TYPES, get_change_summary, get_email_event_type, \
-    is_notification_worthy
+    get_unsubscribe_token_key, is_notification_worthy
 from listener_processing.novu import send_notifications_to_users
 from common.model import Subscription
 from common.db_utils import db_session
@@ -96,6 +97,13 @@ def _handle_dataset_event(session, event: Dict):
         logger.info(f'No users subscribed to dataset {dataset_id}')
         return
 
+    if config.DATASET_EVENT_AGGREGATION_ENABLED:
+        # sent later, aggregated with the dataset's other events (DATASET_NOTIFICATIONS-010, -011)
+        buffer_dataset_event(session, dataset_id, event)
+        logger.info(f'Buffered event "{event.get("event_type")}" for dataset {dataset_id} '
+                    f'({len(user_ids)} subscribers)')
+        return
+
     # Prepare notification data
     resource_name = event.get('resource_name', '')
     change_summary = get_change_summary(event)
@@ -105,7 +113,7 @@ def _handle_dataset_event(session, event: Dict):
         'email_event_type': email_event_type,
         'resource_name': resource_name,
         'change_summary': change_summary,
-        'unsubscribe_token_key': f'unsubscribe_token_{dataset_id.replace("-", "_")}',
+        'unsubscribe_token_key': get_unsubscribe_token_key(dataset_id),
         'hdx_url': config.HDX_URL,
         'dataset_id': dataset_id
     }
